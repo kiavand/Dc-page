@@ -1,17 +1,18 @@
 """
-Persian Reel builder v2.
+Persian Reel builder v3 (modern look, in-person follow-up content).
 
 Input file (input.txt):
-  line 1 starting with "#"  -> cover hook text (also spoken first)
-  every other non-empty line -> one scene (one AI background image)
-The narration is split into short phrases; each phrase is spoken and shown
-on screen at the same time, so text and voice always match.
+  line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
+  every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
+                                   (the "عنوان ::" part is optional)
+Each sentence is spoken and shown on screen one at a time.
+Backgrounds are AI images chosen from the keywords of each scene.
 
-Optional: put .mp3/.wav files (royalty-free music) next to this script or in
-a folder called "music". One is picked and mixed quietly under the voice.
+Optional music: put royalty-free .mp3/.wav files in the repo (root or "music"
+folder); one is mixed quietly under the voice.
 
 Usage: python make_reel.py input.txt out/reel.mp4
-Outputs: reel.mp4 and cover.png (same folder)
+Outputs: reel.mp4 and cover.png in the same folder.
 """
 import asyncio
 import base64
@@ -28,14 +29,20 @@ from pathlib import Path
 
 W, H, FPS = 1080, 1920, 30
 VOICE = "fa-IR-FaridNeural"      # male Persian voice
-RATE = "-3%"
-GAP = 0.12                       # silence between phrases (s)
-TAIL = 0.30                      # silence at the end of each scene (s)
+RATE = "-5%"
+GAP = 0.28                       # pause between sentences (s)
+TAIL = 0.45                      # pause at the end of each scene (s)
+COVER_MIN = 2.6                  # minimum cover length (s)
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
-COVER_LABEL = "آموزش رهبری"       # small label on every cover (change freely)
-STYLE = ", vertical 9:16, cinematic soft lighting, shallow depth of field, no text, no letters, no logos"
-FALLBACK_PROMPT = "calm professional abstract background, soft warm light, blurred bokeh"
+
+# ---- fixed cover template: only the hook text changes between reels
+COVER_TAG = "نتورک مارکتینگ"
+COVER_FOOT = "ذخیره کن  ·  برای تیمت بفرست"
+
+STYLE = (", modern minimalist 3D illustration, soft gradient colors, clean composition, "
+         "vertical 9:16, no text, no letters, no logos")
+FALLBACK_PROMPT = "abstract modern shapes, soft gradient lights, calm professional mood"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -43,8 +50,40 @@ FONT_LINK = ('<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:'
              'wght@500;800&display=swap" rel="stylesheet">')
 FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
 
+# keyword (Persian, without half-spaces) -> visual prompt. First match wins.
+KEYWORDS = [
+    (("ثبتنام", "عضویت", "فرم"),
+     "two people at a desk filling a registration form together, friendly consultant, bright modern office"),
+    (("تیمسازی", "تیم", "همتیم"),
+     "diverse young team collaborating around a table with laptops and notes, teamwork, warm light"),
+    (("قهوه", "کافه"),
+     "two people talking face to face over coffee in a cozy modern cafe"),
+    (("دیدار", "حضوری", "ملاقات", "رودرو"),
+     "two people having a friendly face-to-face meeting with a handshake in a bright modern lounge"),
+    (("جلسه",),
+     "small team meeting in a bright modern room with a whiteboard"),
+    (("گوش", "بپرس", "بشنو"),
+     "person listening attentively to another person in a calm friendly conversation"),
+    (("اعتماد", "رابطه", "همراهی"),
+     "two people shaking hands with warm smiles, trust and partnership"),
+    (("رهبر", "لیدر", "مربی"),
+     "confident mentor guiding a small team in front of a whiteboard"),
+    (("تقویم", "برنامه", "زمان"),
+     "calendar and planner on a wooden desk with a coffee cup, morning light"),
+    (("هدف", "رشد", "موفقیت", "شروع"),
+     "person standing on a hill looking at the sunrise over a city, hopeful new beginning"),
+    (("نگرانی", "استرس", "ترس"),
+     "thoughtful person by a window with soft light, calm mood"),
+    (("پیگیری", "پیام", "تماس"),
+     "friendly follow-up conversation between two people, notebook and phone on a desk, warm light"),
+]
+
 
 # ---------------------------------------------------------------- text
+def norm(s):
+    return (s or "").replace("\u200c", "").replace("ي", "ی").replace("ك", "ک")
+
+
 def parse(text):
     hook, scenes = None, []
     for line in text.splitlines():
@@ -53,32 +92,44 @@ def parse(text):
             continue
         if line.startswith("#") and hook is None:
             hook = line.lstrip("#").strip()
-        else:
-            scenes.append(line)
+            continue
+        title, body = "", line
+        if "::" in line:
+            title, body = [x.strip() for x in line.split("::", 1)]
+        scenes.append({"title": title, "text": body})
     if hook is None:
-        hook = re.split(r"[.؟?!]", scenes[0])[0].strip() if scenes else ""
+        hook = re.split(r"[.؟?!]", scenes[0]["text"])[0].strip() if scenes else ""
     return hook, scenes
 
 
-def split_chunks(text, max_chars=42):
-    parts = re.split(r"(?<=[،,\.؟\?!؛:;…])\s+", text.strip())
+def split_chunks(text, max_chars=72):
+    """One sentence per chunk; long sentences are split at commas."""
     out = []
-    for p in parts:
-        p = p.strip()
-        while len(p) > max_chars * 1.4:
-            cut = p.rfind(" ", 0, max_chars)
-            cut = cut if cut > 10 else max_chars
-            out.append(p[:cut].strip())
-            p = p[cut:].strip()
-        if p:
-            out.append(p)
-    merged = []
+    for s in re.split(r"(?<=[\.؟\?!…؛])\s+", text.strip()):
+        s = s.strip()
+        if not s:
+            continue
+        if len(s) <= max_chars:
+            out.append(s)
+            continue
+        cur = ""
+        for p in re.split(r"(?<=[،,:])\s+", s):
+            if cur and len(cur) + 1 + len(p) > max_chars:
+                out.append(cur)
+                cur = p
+            else:
+                cur = (cur + " " + p).strip()
+        if cur:
+            out.append(cur)
+    final = []
     for p in out:
-        if merged and len(p) < 12 and len(merged[-1]) + len(p) < max_chars:
-            merged[-1] += " " + p
-        else:
-            merged.append(p)
-    return merged
+        while len(p) > max_chars * 1.5:
+            cut = p.rfind(" ", 0, max_chars)
+            cut = cut if cut > 15 else max_chars
+            final.append(p[:cut].strip())
+            p = p[cut:].strip()
+        final.append(p)
+    return final
 
 
 # ---------------------------------------------------------------- AI images
@@ -88,10 +139,19 @@ def _get(url, timeout=60):
         return r.read()
 
 
-def image_prompt(text):
+def keyword_prompt(title, text):
+    for src in (title, text):
+        n = norm(src)
+        for keys, prompt in KEYWORDS:
+            if any(k in n for k in keys):
+                return prompt
+    return None
+
+
+def llm_prompt(text):
     ask = ("Write ONE short English image-generation prompt (max 25 words) for a calm, "
-           "professional photographic background that visually matches this Persian text. "
-           "No text, no letters, no faces. Reply with only the prompt. Text: " + text)
+           "modern illustration that visually matches this Persian text. No text, no letters. "
+           "Reply with only the prompt. Text: " + text)
     q = urllib.parse.quote(ask)
     for base in ("https://text.pollinations.ai/", "https://gen.pollinations.ai/text/"):
         try:
@@ -101,23 +161,30 @@ def image_prompt(text):
                 return out
         except Exception as e:
             print("prompt service failed:", e)
-    return FALLBACK_PROMPT
+    return None
+
+
+def image_prompt(title, text):
+    return keyword_prompt(title, text) or llm_prompt(text) or FALLBACK_PROMPT
 
 
 def fetch_image(prompt, path, seed):
     q = urllib.parse.quote(prompt + STYLE)
-    urls = [
-        f"https://image.pollinations.ai/prompt/{q}?width={W}&height={H}&nologo=true&seed={seed}",
-        f"https://gen.pollinations.ai/image/{q}?width={W}&height={H}&seed={seed}",
-    ]
-    for u in urls:
-        try:
-            data = _get(u, 90)
-            if len(data) > 5000 and (data[:3] == b"\xff\xd8\xff" or data[:4] == b"\x89PNG"):
-                path.write_bytes(data)
-                return True
-        except Exception as e:
-            print("image service failed:", e)
+    for attempt in range(3):
+        s = seed + attempt * 11
+        urls = [
+            f"https://image.pollinations.ai/prompt/{q}?width=864&height=1536&nologo=true&seed={s}",
+            f"https://gen.pollinations.ai/image/{q}?width=864&height=1536&seed={s}",
+        ]
+        for u in urls:
+            try:
+                data = _get(u, 100)
+                if len(data) > 5000 and (data[:3] == b"\xff\xd8\xff" or data[:4] == b"\x89PNG"):
+                    path.write_bytes(data)
+                    return True
+                print("image service returned a non-image reply")
+            except Exception as e:
+                print("image service failed:", e)
     return False
 
 
@@ -152,6 +219,11 @@ def to_wav(src, dst, pad):
          "-af", f"apad=pad_dur={pad}", str(dst)])
 
 
+def silence_wav(dst, seconds):
+    run(["ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+         "-t", f"{seconds:.3f}", str(dst)])
+
+
 def concat_wavs(paths, dst, d):
     lst = d / (dst.stem + "_list.txt")
     lst.write_text("".join(f"file '{p}'\n" for p in paths), encoding="utf-8")
@@ -159,67 +231,96 @@ def concat_wavs(paths, dst, d):
          "-c", "copy", str(dst)])
 
 
-async def build_scene_audio(idx, chunks, d):
-    """Return (scene_wav, [(chunk_text, start, end)], total_duration)."""
+async def build_scene_audio(idx, chunks, d, min_total=0.0):
+    """Return (scene_wav, [(sentence, start, end)], total_duration)."""
     wavs, timing, t = [], [], 0.0
     for j, ch in enumerate(chunks):
         mp3 = d / f"a{idx:02d}_{j:02d}.mp3"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
         await tts(ch, mp3)
-        last = j == len(chunks) - 1
-        to_wav(mp3, wav, TAIL if last else GAP)
+        to_wav(mp3, wav, TAIL if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
-        timing.append((ch, t, t + dur - (TAIL if last else GAP)))
+        timing.append((ch, t, t + dur))
         wavs.append(wav)
         t += dur
+    if t < min_total:
+        extra = d / f"a{idx:02d}_extra.wav"
+        silence_wav(extra, min_total - t)
+        wavs.append(extra)
+        t = min_total
     scene_wav = d / f"scene{idx:02d}.wav"
     concat_wavs(wavs, scene_wav, d)
-    return scene_wav, timing, t
+    return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- rendering
+# ---------------------------------------------------------------- pictures
 def img_b64(path):
     mime = "image/png" if path.suffix == ".png" else "image/jpeg"
     return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
 
-def bg_html(image_path):
-    bg = (f"url({img_b64(image_path)}) center/cover no-repeat" if image_path
-          else "linear-gradient(160deg,#0f172a,#1e3a5f)")
-    return (f"<!doctype html><html><head><meta charset='utf-8'><style>"
-            f"html,body{{margin:0;width:{W}px;height:{H}px}}"
+MESH = ("radial-gradient(circle at 18% 14%,rgba(124,58,237,.80),transparent 46%),"
+        "radial-gradient(circle at 88% 42%,rgba(251,191,36,.45),transparent 40%),"
+        "radial-gradient(circle at 28% 88%,rgba(14,165,233,.62),transparent 46%),#0b1020")
+
+
+def bg_html(image_path, idx, total, title):
+    bg = (f"#0b1020 url({img_b64(image_path)}) center/cover no-repeat"
+          if image_path else MESH)
+    segs = "".join(f"<i class='{'on' if k <= idx else ''}'></i>" for k in range(1, total + 1))
+    t = f"<div class='t'><span>{html.escape(title)}</span></div>" if title else ""
+    deco = ""
+    if not image_path:
+        deco = ("<div class='r1'></div><div class='r2'></div><div class='r3'></div>"
+                + (f"<div class='big'>{html.escape(title)}</div>" if title else ""))
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
             f"body{{background:{bg}}}"
             f".s{{position:absolute;inset:0;background:linear-gradient(to bottom,"
-            f"rgba(0,0,0,.30),rgba(0,0,0,.55))}}</style></head>"
-            f"<body><div class='s'></div></body></html>")
+            f"rgba(0,0,0,.38),rgba(0,0,0,0) 28%,rgba(0,0,0,0) 50%,rgba(0,0,0,.72))}}"
+            f".p{{position:absolute;top:110px;left:70px;right:70px;display:flex;gap:10px;direction:rtl}}"
+            f".p i{{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.35)}}"
+            f".p i.on{{background:#fbbf24}}"
+            f".t{{position:absolute;top:190px;left:0;right:0;text-align:center}}"
+            f".t span{{display:inline-block;background:rgba(255,255,255,.20);"
+            f"border:2px solid rgba(255,255,255,.40);color:#fff;font-family:{FONT};"
+            f"font-weight:800;font-size:56px;line-height:1.5;padding:14px 48px;border-radius:60px}}"
+            f".r1,.r2,.r3{{position:absolute;border-radius:50%;border:3px solid rgba(255,255,255,.14);left:50%;top:760px;transform:translate(-50%,-50%)}}"
+            f".r1{{width:420px;height:420px}}.r2{{width:720px;height:720px}}.r3{{width:1020px;height:1020px;border-color:rgba(251,191,36,.20)}}"
+            f".big{{position:absolute;left:0;right:0;top:640px;text-align:center;color:#fff;opacity:.16;font-family:{FONT};font-weight:800;font-size:170px;line-height:1.3;padding:0 60px}}"
+            f"</style></head><body><div class='s'></div>{deco}<div class='p'>{segs}</div>{t}</body></html>")
 
 
 def sub_html(text):
     n = len(text)
-    size = 70 if n < 28 else 62 if n < 40 else 56
+    size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent}}"
-            f".w{{position:absolute;left:0;right:0;top:1130px;display:flex;justify-content:center}}"
-            f".b{{max-width:900px;background:rgba(0,0,0,.58);color:#fff;font-family:{FONT};"
-            f"font-weight:800;font-size:{size}px;line-height:1.7;padding:24px 44px;"
-            f"border-radius:36px;text-align:center}}</style></head>"
-            f"<body><div class='w'><div class='b'>{html.escape(text)}</div></div></body></html>")
+            f".w{{position:absolute;left:0;right:0;top:1150px;display:flex;justify-content:center}}"
+            f".b{{max-width:880px;background:rgba(10,14,30,.66);color:#fff;font-family:{FONT};"
+            f"font-weight:800;font-size:{size}px;line-height:1.75;padding:28px 50px;"
+            f"border-radius:40px;text-align:center;border-right:12px solid #fbbf24}}"
+            f"</style></head><body><div class='w'><div class='b'>{html.escape(text)}</div></div></body></html>")
 
 
 def cover_html(hook):
     n = len(hook)
-    size = 120 if n < 30 else 100 if n < 55 else 84
+    size = 118 if n < 30 else 98 if n < 55 else 82
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px}}"
-            f"body{{background:linear-gradient(160deg,#0b1020,#1e3a5f 60%,#7c3aed);"
-            f"font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
-            f"align-items:center;justify-content:center;text-align:center}}"
-            f".tag{{background:#fbbf24;color:#111;font-weight:800;font-size:46px;"
-            f"padding:10px 40px;border-radius:60px;margin-bottom:70px}}"
-            f".h{{font-weight:800;font-size:{size}px;line-height:1.6;padding:0 80px}}"
-            f".bar{{width:220px;height:14px;background:#fbbf24;border-radius:8px;margin-top:70px}}"
-            f"</style></head><body><div class='tag'>{html.escape(COVER_LABEL)}</div>"
-            f"<div class='h'>{html.escape(hook)}</div><div class='bar'></div></body></html>")
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
+            f"body{{background:{MESH};font-family:{FONT};color:#fff;display:flex;"
+            f"flex-direction:column;align-items:center;justify-content:center;text-align:center}}"
+            f".tag{{background:#fbbf24;color:#111;font-weight:800;font-size:48px;"
+            f"padding:12px 46px;border-radius:60px;margin-bottom:60px}}"
+            f".card{{margin:0 70px;padding:100px 60px;border-radius:70px;"
+            f"background:rgba(255,255,255,.09);border:2px solid rgba(255,255,255,.28)}}"
+            f".h{{font-weight:800;font-size:{size}px;line-height:1.6}}"
+            f".bar{{width:240px;height:14px;background:#fbbf24;border-radius:8px;margin:60px auto 0}}"
+            f".f{{position:absolute;bottom:260px;left:0;right:0;font-size:46px;"
+            f"font-weight:500;color:#e2e8f0}}"
+            f"</style></head><body><div class='tag'>{html.escape(COVER_TAG)}</div>"
+            f"<div class='card'><div class='h'>{html.escape(hook)}</div><div class='bar'></div></div>"
+            f"<div class='f'>{html.escape(COVER_FOOT)}</div></body></html>")
 
 
 def render_pages(jobs):
@@ -252,7 +353,7 @@ def scene_video(idx, bg_png, subs, dur, is_last, out):
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last = "v0"
     for k, (_, a, b) in enumerate(subs, start=1):
-        fc += (f";[{last}][{k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
+        fc += f";[{last}][{k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]"
         last = f"v{k}"
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
@@ -285,10 +386,7 @@ def assemble(clips, durs, voice_wav, music, out):
         fc += (f"{last}[{i}:v]xfade=transition=fade:duration={XFADE}:"
                f"offset={start:.3f}[x{i}];")
         last = f"[x{i}]"
-    if len(clips) == 1:
-        fc += "[0:v]null[vout];"
-    else:
-        fc += f"{last}null[vout];"
+    fc += f"{last}null[vout];" if len(clips) > 1 else "[0:v]null[vout];"
     if music:
         fc += (f"[{vi+1}:a]volume={MUSIC_VOLUME},afade=t=in:d=1,"
                f"afade=t=out:st={max(total-1.5,0):.3f}:d=1.5[m];"
@@ -304,22 +402,21 @@ def assemble(clips, durs, voice_wav, music, out):
 
 # ---------------------------------------------------------------- main
 async def build(hook, scenes, d, dst):
-    # 1) audio for cover + scenes
-    all_scenes = [("cover", [hook])] + [("scene", split_chunks(s)) for s in scenes]
-    audio = []
-    for i, (_, chunks) in enumerate(all_scenes):
-        audio.append(await build_scene_audio(i, chunks, d))
+    n = len(scenes) + 1
+    # 1) audio: cover first, then scenes
+    audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
+    for i, sc in enumerate(scenes, start=1):
+        audio.append(await build_scene_audio(i, split_chunks(sc["text"]), d))
 
-    # 2) AI backgrounds
-    bg_images = [None]
-    for i, s in enumerate(scenes, start=1):
+    # 2) AI backgrounds (keyword based)
+    images, report = [None], []
+    for i, sc in enumerate(scenes, start=1):
         path = d / f"ai{i:02d}.jpg"
-        prompt = image_prompt(s)
+        prompt = image_prompt(sc["title"], sc["text"])
         print(f"scene {i} image prompt: {prompt}")
         ok = fetch_image(prompt, path, seed=i * 7 + 3)
-        bg_images.append(path if ok else None)
-        if not ok:
-            print(f"scene {i}: AI image failed, using gradient background")
+        images.append(path if ok else None)
+        report.append("AI image" if ok else "FALLBACK background")
 
     # 3) render all pictures in one browser session
     jobs, bg_pngs, sub_pngs = [], [], []
@@ -327,9 +424,9 @@ async def build(hook, scenes, d, dst):
     jobs.append((cover_html(hook), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
-    for i in range(1, len(all_scenes)):
+    for i, sc in enumerate(scenes, start=1):
         bp = d / f"bg{i:02d}.png"
-        jobs.append((bg_html(bg_images[i]), bp, False))
+        jobs.append((bg_html(images[i], i, len(scenes), sc["title"]), bp, False))
         bg_pngs.append(bp)
         row = []
         for j, (txt, a, b) in enumerate(audio[i][1]):
@@ -339,9 +436,8 @@ async def build(hook, scenes, d, dst):
         sub_pngs.append(row)
     await asyncio.to_thread(render_pages, jobs)
 
-    # 4) video per scene, then join with crossfades
+    # 4) one clip per scene, joined with crossfades
     clips, durs = [], []
-    n = len(all_scenes)
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
         dur = audio[i][2]
@@ -356,6 +452,8 @@ async def build(hook, scenes, d, dst):
     assemble(clips, durs, voice, music, dst)
     (dst.parent / "cover.png").write_bytes(cover_png.read_bytes())
     total = sum(durs)
+    for i, r in enumerate(report, start=1):
+        print(f"scene {i}: {r}")
     print(f"Done: {dst} ({n} scenes incl. cover, {total:.1f} s)")
     if total > 90:
         print("WARNING: Instagram API allows Reels up to 90 seconds only.")
