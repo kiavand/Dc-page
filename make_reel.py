@@ -337,7 +337,7 @@ async def build(hook, scenes, d, dst):
             jobs.append((sub_html(txt), sp, True))
             row.append((sp, a, b))
         sub_pngs.append(row)
-    render_pages(jobs)
+    await asyncio.to_thread(render_pages, jobs)
 
     # 4) video per scene, then join with crossfades
     clips, durs = [], []
