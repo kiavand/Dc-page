@@ -1,0 +1,31 @@
+name: make-reel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install Python packages and Chromium
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Build reel
+        run: python make_reel.py input.txt out/reel.mp4
+
+      - name: Save video
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel
+          path: out/reel.mp4
