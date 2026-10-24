@@ -1,11 +1,24 @@
-name: make-reel
+name: reel-bot
 
 on:
+  schedule:
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: reel-bot
+  cancel-in-progress: false
+
 jobs:
-  build:
+  run:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -13,21 +26,27 @@ jobs:
         with:
           python-version: 3.12
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Check Telegram
+        id: poll
+        run: python bot.py poll
 
-      - name: Install Python packages and Chromium
+      - name: Save state
+        if: steps.poll.outputs.changed == 'true'
         run: |
+          git config user.name "reel-bot"
+          git config user.email "reel-bot@users.noreply.github.com"
+          git add state/offset.txt
+          git commit -m "update state" || true
+          git pull --rebase || true
+          git push
+
+      - name: Install tools
+        if: steps.poll.outputs.jobs != '0'
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Build reel
-        run: python make_reel.py input.txt out/reel.mp4
-
-      - name: Save video and cover
-        uses: actions/upload-artifact@v4
-        with:
-          name: reel
-          path: |
-            out/reel.mp4
-            out/cover.png
+      - name: Build and send
+        if: steps.poll.outputs.jobs != '0'
+        run: python bot.py build
