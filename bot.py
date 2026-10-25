@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reel import UA, norm  # stdlib-only import, safe before pip install
+from make_reel import UA, norm, strip_marks  # stdlib-only import, safe before pip install
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -33,16 +33,16 @@ HELP = (
     "ربات هر چند دقیقه پیام‌ها رو چک می‌کنه، پس جواب‌ها فوری نیست."
 )
 
-BASE_TAGS = ["#نتورک_مارکتینگ", "#رشد_فردی", "#آموزش"]
+BASE_TAGS = ["#ریلز", "#رشد_فردی", "#آموزش"]
 TAG_MAP = [
-    (("پیگیری",), ["#پیگیری", "#پیگیری_حضوری"]),
-    (("ثبتنام", "عضویت"), ["#ثبت_نام"]),
+    (("نتورک",), ["#نتورک_مارکتینگ"]),
+    (("پیگیری",), ["#پیگیری"]),
     (("تیمسازی", "تیم"), ["#تیم_سازی"]),
     (("رهبر", "لیدر"), ["#رهبری"]),
+    (("انگیزه", "موفقیت", "هدف", "شکست"), ["#انگیزشی", "#موفقیت"]),
+    (("داستان",), ["#داستان"]),
+    (("کتاب",), ["#کتاب", "#کتابخوانی"]),
     (("اعتماد",), ["#اعتماد"]),
-    (("گوش",), ["#مهارت_گوش_دادن"]),
-    (("جلسه", "دیدار", "حضوری"), ["#جلسه_حضوری"]),
-    (("هدف", "رشد", "موفقیت"), ["#موفقیت"]),
 ]
 
 
@@ -111,69 +111,102 @@ def auto_format(text):
     return "# " + hook + "\n" + "\n".join(scenes) + "\n"
 
 
-def make_caption(job_text):
+CAPTION_PROMPT = (
+    "You write Persian Instagram captions for short videos. You receive the video script. Write: "
+    "1) a first line (at most 12 words) that creates curiosity; 2) a conceptual summary in 2 to 3 "
+    "sentences, in your own words, explaining the key idea and why it matters to the viewer. Do NOT copy "
+    "or closely paraphrase sentences from the script; 3) one call-to-action line that fits the topic "
+    "(save, share or comment); 4) a blank line, then 6 to 8 relevant Persian hashtags (use underscores "
+    "inside multi-word tags, for example #رشد_فردی). Do not use diacritics. Use at most two emojis. "
+    "Output only the caption."
+)
+
+
+def script_parts(job_text):
     hook, scenes = "", []
     for line in job_text.splitlines():
         line = line.strip()
         if not line:
             continue
         if line.startswith("#") and not hook:
-            hook = line.lstrip("#").strip()
+            hook = line.lstrip("#").split("|")[0].strip()
         else:
             scenes.append(line.split("::", 1)[1].strip() if "::" in line else line)
-    teaser = ""
-    if scenes:
-        sents = re.split(r"(?<=[\.؟\?!…])\s+", scenes[0])
-        teaser = " ".join(sents[:2]).strip()
+    return strip_marks(hook), [strip_marks(x) for x in scenes]
+
+
+def fallback_caption(job_text):
+    hook, _ = script_parts(job_text)
     n = norm(job_text)
     tags = []
     for keys, hs in TAG_MAP:
         if any(k in n for k in keys):
             tags += [h for h in hs if h not in tags]
     tags = (tags + BASE_TAGS)[:8]
-    return (f"{hook}\n\n{teaser}\n\n"
-            "📌 ذخیره کن و برای هم‌تیمی‌ات بفرست.\n"
+    return (f"{hook}\n\n📌 ذخیره کن و برای دوستت بفرست.\n"
             "💬 نظرت رو زیر همین ریلز بنویس 👇\n\n" + " ".join(tags))
 
 
+def make_caption(job_text):
+    hook, scenes = script_parts(job_text)
+    plain = hook + "\n" + "\n".join(scenes)
+    out = llm(CAPTION_PROMPT, plain, 0.6)
+    if out:
+        out = strip_marks(out.replace("```", "").replace("**", "").strip())
+        letters = [c for c in out if c.isalpha()]
+        persian = sum("\u0600" <= c <= "\u06FF" for c in letters)
+        sentences = [x.strip() for sc in scenes for x in re.split(r"(?<=[\.؟\?!…])\s+", sc)
+                     if len(x.strip()) >= 25]
+        copied = any(x in out for x in sentences)
+        if letters and persian / len(letters) > 0.6 and 80 <= len(out) <= 1800 and "#" in out and not copied:
+            return out
+    return fallback_caption(job_text)
+
 
 # ---------------------------------------------------------------- AI editor
-EXAMPLE_IN = ("پیگیری حضوری یعنی دیدار با ادم ها و حرف زدن باهاشون. اول گوش بده بعد ثبت نام رو توضیح بده "
-              "و بعدش تیم سازی رو شروع کن و ولشون نکن")
+EXAMPLE_IN = ("ادمایی ک موفق میشن اولش خیلی شکست خوردن ولی ول نکردن هر روز یه قدم کوچیک برداشتن "
+              "و صبر کردن")
 EXAMPLE_OUT = (
-    "# پیگیری حضوری؛ رابطه‌ای که می‌ماند\n"
-    "دیدار حضوری :: پیگیری واقعی با یک دیدار حضوری شروع می‌شود. یک گفتگوی صمیمی، فرصتی برای شنیدن حرف‌های طرف مقابل است.\n"
-    "گوش دادن :: اول بپرس و با دقت گوش بده. هدف‌ها و نگرانی‌های او را بشناس تا احساس کند دیده شده است.\n"
-    "ثبت‌نام :: وقتی آماده بود، مسیر ثبت‌نام را ساده و روشن توضیح بده. اگر هنوز آماده نبود، یک زمان مشخص برای دیدار بعدی بگذار.\n"
-    "تیم‌سازی :: ثبت‌نام پایان کار نیست، شروع تیم‌سازی است. همان روز اولین قدم‌ها را با او بنویس و جلسه‌ی بعدی را هماهنگ کن.\n"
-    "ادامه رابطه :: بعد از ثبت‌نام او را رها نکن. یک پیام کوتاه یا یک دیدار دوباره نشان می‌دهد که تنها نیست.\n"
-    "جمع‌بندی :: پیگیری حضوری یعنی اعتماد، گوش دادن و همراهی. اگر این ویدیو به کارت آمد، ذخیره‌اش کن و برای هم‌تیمی‌ات بفرست."
+    "# شکست، پایانِ راه نیست | انگیزشی\n"
+    "شروعِ سخت :: همهٔ آدم‌هایِ موفق، در ابتدایِ مسیر بارها شکست خورده‌اند. امّا آن‌ها تسلیم نشدند.\n"
+    "ادامه دادن :: هر روز فقط یک قدمِ کوچک بردار. پیروزی، نتیجهٔ تکرارِ قدم‌هایِ ساده است.\n"
+    "باور :: اگر امروز زمین خوردی، یعنی در حالِ حرکت هستی. کسی که تلاش می‌کند، همیشه از دیروزِ خودش جلوتر است.\n"
+    "صبر :: نتیجه‌ها همیشه سریع نمی‌آیند. گاهی ریشه‌ها زیرِ خاک رشد می‌کنند، پیش از آنکه درخت دیده شود.\n"
+    "جمع‌بندی :: شکست، پایانِ راه نیست؛ دعوتی برایِ دوباره شروع کردن است. اگر این ویدیو به کارت آمد، ذخیره‌اش کن و برایِ دوستت بفرست."
 )
 
 EDITOR_PROMPT = (
-    "ROLE: You are a senior Persian script editor for short-form video (Instagram Reels) in the field of "
-    "network-marketing education and team leadership. You edit like a professional copy editor and a "
-    "spoken-word coach.\n\n"
+    "ROLE: You are a senior Persian script editor for short-form video (Instagram Reels). The page covers "
+    "any topic: motivation, success stories, storytelling, excerpts from books, education, personal "
+    "development, business and more. You edit like a professional copy editor and a spoken-word coach.\n\n"
     "GOAL: Take the author's rough text and return a polished script whose meaning reaches the audience "
-    "exactly as the author intended: clear, warm, empathetic and easy to follow when heard only once.\n\n"
+    "exactly as the author intended: clear, emotionally engaging and easy to follow when heard only once.\n\n"
     "HARD RULES\n"
-    "1. Preserve the author's ideas, their order and their intent. Never invent new claims, statistics, "
-    "stories, promises or advice that the author did not state or clearly imply.\n"
-    "2. If a sentence is incomplete or unclear, complete it using only what the surrounding text clearly implies.\n"
-    "3. Never add income claims, guarantees, earnings, get-rich language, pressure tactics or hard selling. "
-    "The theme is in-person follow-up, registration (ثبت‌نام) and team building built on trust.\n"
-    "4. Fix all spelling, grammar, punctuation and half-space (نیم‌فاصله) errors.\n"
-    "5. Write simple, correct, natural Persian that a male narrator can read aloud smoothly: standard "
-    "spelling (not slang spellings), short sentences of about 8 to 16 words, one idea per sentence, and "
-    "punctuation exactly where a speaker would pause.\n"
-    "6. Address the viewer directly (تو), in a supportive, never preachy tone.\n"
-    "7. Total length: 90 to 140 words.\n\n"
+    "1. Preserve the author's ideas, their order, their tone and their intent. Never invent facts, names, "
+    "numbers, quotes, stories or promises that the author did not write.\n"
+    "2. If the text is a story or an excerpt from a book, keep the author's own wording as much as possible: "
+    "only fix mistakes, complete broken sentences and split it into scenes.\n"
+    "3. If a sentence is incomplete or unclear, complete it using only what the surrounding text clearly implies.\n"
+    "4. Do not add claims, guarantees or promotional language that the author did not write.\n"
+    "5. Fix all spelling, grammar, punctuation and half-space (نیم‌فاصله) errors.\n"
+    "6. Write natural Persian that a male narrator can read aloud smoothly: short sentences of about 8 to 18 "
+    "words, one idea per sentence, punctuation exactly where a speaker would pause. Match the author's "
+    "register; address the viewer as تو only if it suits the text.\n"
+    "7. Length: 80 to 160 words in total. If the source is longer, condense it faithfully, keeping the "
+    "main idea and the most important lines.\n"
+    "8. PRONUNCIATION MARKS (very important): write the hook and every scene sentence with Persian "
+    "diacritics so the narrator pronounces them correctly: mark every ezafe (kasra after a consonant, "
+    "like پایانِ راه; «یِ» after ی or ا, like مسیرِ... and آدم‌هایِ; and the hamza sign after a silent ه, "
+    "like همهٔ and نتیجهٔ), add tashdid (like امّا), and add short vowels on words that are easy to "
+    "mispronounce or ambiguous (like مَرد and مُرد). Do not mark every letter. Do not put diacritics in "
+    "scene titles.\n\n"
     "STRUCTURE (exact)\n"
-    "Line 1: '# ' followed by a hook title of at most 8 words that makes a viewer stop scrolling (a relatable "
-    "feeling, a common mistake or a promise of clarity).\n"
-    "Next 4 to 6 lines: one scene per line in the form 'title :: two or three sentences'. Each title is 1 to 3 words.\n"
-    "The last scene is a warm wrap-up that ends with one gentle call to action (save, share with a teammate "
-    "or comment), phrased naturally.\n"
+    "Line 1: '# ' + a hook title of at most 8 words that makes a viewer stop scrolling, then ' | ' and a "
+    "label of one or two words that names the type of the video (for example: داستان, انگیزشی, آموزشی, "
+    "از یک کتاب, تجربه).\n"
+    "Next 4 to 6 lines: one scene per line in the form 'title :: two or three sentences'. Titles are 1 to 3 words.\n"
+    "When it fits the text (not for a book excerpt), the last scene is a short wrap-up with one gentle call "
+    "to action such as save, share or comment.\n"
     "Output ONLY the script: no explanations, no markdown, no bold, no quotes, no numbering.\n\n"
     "EXAMPLE\n"
     "AUTHOR TEXT:\n" + EXAMPLE_IN + "\n"
@@ -182,14 +215,15 @@ EDITOR_PROMPT = (
 
 REVIEW_PROMPT = (
     "You are the final quality reviewer of a Persian Reels script. You receive the AUTHOR TEXT and an edited "
-    "DRAFT. Check: (1) every idea of the author is preserved, and nothing new or promotional was added; "
-    "(2) all sentences are complete, fluent, grammatically correct and natural to hear; (3) each scene has one "
-    "clear idea and the order is logical; (4) the format is exact: first line '# hook', then lines of the form "
-    "'title :: sentences'; (5) the total is 90 to 140 words. Fix any problem directly and return the improved "
-    "script in the same format. If the draft is already good, return it unchanged. Output ONLY the script."
+    "DRAFT. Check: (1) every idea of the author is preserved, in the author's tone, and nothing new "
+    "(facts, numbers, quotes, promises) was invented; (2) all sentences are complete, fluent, "
+    "grammatically correct and natural to hear; (3) each scene has one clear idea and the order is "
+    "logical; (4) the hook and all sentences carry correct pronunciation marks: ezafe kasra, the hamza "
+    "sign after silent ه, tashdid and short vowels on ambiguous words; titles have none; (5) the format "
+    "is exact: first line '# hook | label', then lines 'title :: sentences'; (6) the total is 80 to 160 "
+    "words. Fix any problem directly and return the improved script in the same format. If the draft is "
+    "already good, return it unchanged. Output ONLY the script."
 )
-
-BANNED = ("درآمد", "میلیون", "ثروت", "تضمین", "پولدار", "فروش", "سود")
 
 
 def llm(system, user, temperature=0.4):
@@ -230,12 +264,17 @@ def valid_script(s):
     if not letters:
         return False
     persian = sum("\u0600" <= c <= "\u06FF" for c in letters)
-    return persian / len(letters) > 0.7 and 35 <= len(s.split()) <= 240
+    return persian / len(letters) > 0.7 and 35 <= len(strip_marks(s).split()) <= 220
+
+
+def _digits(s):
+    table = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    return set(re.findall(r"[0-9]+", s.translate(table)))
 
 
 def rules_ok(out, original):
-    o, n = norm(original), norm(out)
-    return not any(w in n and w not in o for w in BANNED)
+    """The editor may not invent numbers (dates, statistics, amounts)."""
+    return _digits(out) <= _digits(original)
 
 
 def improve(text):
