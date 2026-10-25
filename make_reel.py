@@ -30,6 +30,7 @@ from pathlib import Path
 W, H, FPS = 1080, 1920, 30
 VOICE = "fa-IR-FaridNeural"      # male Persian voice
 RATE = "-5%"
+USE_DIACRITICS_FOR_VOICE = True   # set False if the voice mispronounces marked text
 GAP = 0.28                       # pause between sentences (s)
 TAIL = 0.45                      # pause at the end of each scene (s)
 COVER_MIN = 2.6                  # minimum cover length (s)
@@ -37,7 +38,7 @@ XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
 
 # ---- fixed cover template: only the hook text changes between reels
-COVER_TAG = "نتورک مارکتینگ"
+COVER_TAG = "نکته‌ی امروز"          # default label; a reel can set its own ("# تیتر | برچسب")
 COVER_FOOT = "ذخیره کن  ·  برای تیمت بفرست"
 
 STYLE = (", realistic photo, natural light, shallow depth of field, high quality, "
@@ -83,22 +84,48 @@ KEYWORDS = [
      "candid photo of two people laughing together, genuine connection"),
     (("پیگیری",),
      "candid photo of two friendly people having a follow-up conversation at a table with a notebook"),
+    (("کتاب", "مطالعه", "خواندن"),
+     "candid photo of a person reading a book in a cozy room, warm light"),
+    (("شکست", "ناامید", "ناامیدی"),
+     "candid photo of a person sitting alone and thinking, soft light, hopeful mood"),
+    (("تلاش", "پشتکار"),
+     "candid photo of a determined person working hard at a desk, morning light"),
+    (("پیروزی", "موفق", "جشن"),
+     "candid photo of a person celebrating success with arms raised outdoors"),
+    (("قله", "کوه"),
+     "candid photo of a person hiking up a mountain path at sunrise"),
+    (("دوست", "خانواده"),
+     "candid photo of friends laughing together outdoors, warm light"),
 ]
 
 
 # ---------------------------------------------------------------- text
+MARKS = re.compile("[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]")  # harakat, hamza sign, tatweel
+
+
+def strip_marks(s):
+    """Remove diacritics (kasra, hamza sign, ...) so subtitles stay clean."""
+    return MARKS.sub("", (s or "").replace("\u06C0", "\u0647"))
+
+
+def speak_text(s):
+    return s if USE_DIACRITICS_FOR_VOICE else strip_marks(s)
+
+
 def norm(s):
-    return (s or "").replace("\u200c", "").replace("ي", "ی").replace("ك", "ک")
+    return strip_marks(s).replace("\u200c", "").replace("ي", "ی").replace("ك", "ک")
 
 
 def parse(text):
-    hook, scenes = None, []
+    hook, tag, scenes = None, None, []
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
         if line.startswith("#") and hook is None:
             hook = line.lstrip("#").strip()
+            if "|" in hook:
+                hook, tag = [x.strip() for x in hook.split("|", 1)]
             continue
         title, body = "", line
         if "::" in line:
@@ -106,22 +133,23 @@ def parse(text):
         scenes.append({"title": title, "text": body})
     if hook is None:
         hook = re.split(r"[.؟?!]", scenes[0]["text"])[0].strip() if scenes else ""
-    return hook, scenes
+    return hook, tag, scenes
 
 
 def split_chunks(text, max_chars=72):
     """One sentence per chunk; long sentences are split at commas."""
     out = []
+    L = lambda x: len(strip_marks(x))
     for s in re.split(r"(?<=[\.؟\?!…؛])\s+", text.strip()):
         s = s.strip()
         if not s:
             continue
-        if len(s) <= max_chars:
+        if L(s) <= max_chars:
             out.append(s)
             continue
         cur = ""
         for p in re.split(r"(?<=[،,:])\s+", s):
-            if cur and len(cur) + 1 + len(p) > max_chars:
+            if cur and L(cur) + 1 + L(p) > max_chars:
                 out.append(cur)
                 cur = p
             else:
@@ -130,7 +158,7 @@ def split_chunks(text, max_chars=72):
             out.append(cur)
     final = []
     for p in out:
-        while len(p) > max_chars * 1.5:
+        while L(p) > max_chars * 1.5:
             cut = p.rfind(" ", 0, max_chars)
             cut = cut if cut > 15 else max_chars
             final.append(p[:cut].strip())
@@ -244,7 +272,7 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL):
     for j, ch in enumerate(chunks):
         mp3 = d / f"a{idx:02d}_{j:02d}.mp3"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
-        await tts(ch, mp3)
+        await tts(speak_text(ch), mp3)
         to_wav(mp3, wav, tail if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
         timing.append((ch, t, t + dur))
@@ -275,6 +303,7 @@ def bg_html(image_path, idx, total, title):
     bg = (f"#0b1020 url({img_b64(image_path)}) center/cover no-repeat"
           if image_path else MESH)
     segs = "".join(f"<i class='{'on' if k <= idx else ''}'></i>" for k in range(1, total + 1))
+    title = strip_marks(title)
     t = f"<div class='t'><span>{html.escape(title)}</span></div>" if title else ""
     deco = ""
     if not image_path:
@@ -299,6 +328,7 @@ def bg_html(image_path, idx, total, title):
 
 
 def sub_html(text):
+    text = strip_marks(text)
     n = len(text)
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
@@ -310,7 +340,8 @@ def sub_html(text):
             f"</style></head><body><div class='w'><div class='b'>{html.escape(text)}</div></div></body></html>")
 
 
-def cover_html(hook):
+def cover_html(hook, tag=None):
+    hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
     n = len(hook)
     size = 118 if n < 30 else 98 if n < 55 else 82
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
@@ -325,7 +356,7 @@ def cover_html(hook):
             f".bar{{width:240px;height:14px;background:#fbbf24;border-radius:8px;margin:60px auto 0}}"
             f".f{{position:absolute;bottom:260px;left:0;right:0;font-size:46px;"
             f"font-weight:500;color:#e2e8f0}}"
-            f"</style></head><body><div class='tag'>{html.escape(COVER_TAG)}</div>"
+            f"</style></head><body><div class='tag'>{html.escape(tag)}</div>"
             f"<div class='card'><div class='h'>{html.escape(hook)}</div><div class='bar'></div></div>"
             f"<div class='f'>{html.escape(COVER_FOOT)}</div></body></html>")
 
@@ -432,7 +463,7 @@ def plan_shots(scenes):
     return shots
 
 
-async def build(hook, scenes, d, dst):
+async def build(hook, scenes, d, dst, tag=None):
     shots = plan_shots(scenes)
     n = len(shots) + 1
 
@@ -462,7 +493,7 @@ async def build(hook, scenes, d, dst):
     # 3) render all pictures in one browser session
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook), cover_png, False))
+    jobs.append((cover_html(hook, tag), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
     for k, sh in enumerate(shots, start=1):
@@ -502,11 +533,11 @@ async def build(hook, scenes, d, dst):
 
 def main():
     src, dst = Path(sys.argv[1]), Path(sys.argv[2])
-    hook, scenes = parse(src.read_text(encoding="utf-8"))
+    hook, tag, scenes = parse(src.read_text(encoding="utf-8"))
     if not scenes:
         sys.exit("Input file has no scenes.")
     with tempfile.TemporaryDirectory() as t:
-        asyncio.run(build(hook, scenes, Path(t), dst))
+        asyncio.run(build(hook, scenes, Path(t), dst, tag))
 
 
 if __name__ == "__main__":
