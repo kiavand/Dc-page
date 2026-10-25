@@ -40,9 +40,10 @@ MUSIC_VOLUME = 0.12
 COVER_TAG = "نتورک مارکتینگ"
 COVER_FOOT = "ذخیره کن  ·  برای تیمت بفرست"
 
-STYLE = (", modern minimalist 3D illustration, soft gradient colors, clean composition, "
+STYLE = (", realistic photo, natural light, shallow depth of field, high quality, "
          "vertical 9:16, no text, no letters, no logos")
-FALLBACK_PROMPT = "abstract modern shapes, soft gradient lights, calm professional mood"
+FALLBACK_PROMPT = "candid photo of friendly people talking in a bright modern office, warm light"
+MAX_SHOTS = 16                   # most pictures used in one reel
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -53,29 +54,35 @@ FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
 # keyword (Persian, without half-spaces) -> visual prompt. First match wins.
 KEYWORDS = [
     (("ثبتنام", "عضویت", "فرم"),
-     "two people at a desk filling a registration form together, friendly consultant, bright modern office"),
+     "candid photo of two people at a desk filling out a registration form together, friendly consultant, bright modern office"),
     (("تیمسازی", "تیم", "همتیم"),
-     "diverse young team collaborating around a table with laptops and notes, teamwork, warm light"),
+     "candid photo of a diverse team of young people collaborating around a table, smiling, warm light"),
     (("قهوه", "کافه"),
-     "two people talking face to face over coffee in a cozy modern cafe"),
+     "candid photo of two people talking face to face over coffee in a cozy cafe"),
     (("دیدار", "حضوری", "ملاقات", "رودرو"),
-     "two people having a friendly face-to-face meeting with a handshake in a bright modern lounge"),
+     "candid photo of two people meeting face to face and shaking hands in a bright modern lounge"),
     (("جلسه",),
-     "small team meeting in a bright modern room with a whiteboard"),
-    (("گوش", "بپرس", "بشنو"),
-     "person listening attentively to another person in a calm friendly conversation"),
-    (("اعتماد", "رابطه", "همراهی"),
-     "two people shaking hands with warm smiles, trust and partnership"),
+     "candid photo of a small team meeting around a table with notes in a bright room"),
+    (("گوش", "بپرس", "بشنو", "شنیدن", "حرفها"),
+     "candid photo of a person listening attentively to another person in a friendly conversation"),
+    (("اعتماد", "همراهی", "کنارش"),
+     "candid photo of two people smiling and shaking hands, trust and partnership"),
     (("رهبر", "لیدر", "مربی"),
-     "confident mentor guiding a small team in front of a whiteboard"),
-    (("تقویم", "برنامه", "زمان"),
-     "calendar and planner on a wooden desk with a coffee cup, morning light"),
+     "candid photo of a confident mentor guiding a small team at a whiteboard"),
+    (("بنویس", "یادداشت", "قدمها", "قدم"),
+     "candid photo of two people writing a plan together in a notebook"),
+    (("تقویم", "هماهنگ", "زمان"),
+     "candid photo of a person writing in a planner next to a coffee cup, morning light"),
+    (("پیام", "تماس", "تلفن"),
+     "candid photo of a person smiling while talking on the phone, warm light"),
     (("هدف", "رشد", "موفقیت", "شروع"),
-     "person standing on a hill looking at the sunrise over a city, hopeful new beginning"),
-    (("نگرانی", "استرس", "ترس"),
-     "thoughtful person by a window with soft light, calm mood"),
-    (("پیگیری", "پیام", "تماس"),
-     "friendly follow-up conversation between two people, notebook and phone on a desk, warm light"),
+     "candid photo of a smiling person looking ahead at the sunrise, hopeful"),
+    (("نگرانی", "استرس", "ترس", "تنها"),
+     "candid photo of a thoughtful person by a window, soft light"),
+    (("رابطه", "صمیمی"),
+     "candid photo of two people laughing together, genuine connection"),
+    (("پیگیری",),
+     "candid photo of two friendly people having a follow-up conversation at a table with a notebook"),
 ]
 
 
@@ -149,8 +156,8 @@ def keyword_prompt(title, text):
 
 
 def llm_prompt(text):
-    ask = ("Write ONE short English image-generation prompt (max 25 words) for a calm, "
-           "modern illustration that visually matches this Persian text. No text, no letters. "
+    ask = ("Write ONE short English image-generation prompt (max 25 words) for a realistic "
+           "candid photo that features real people and visually matches this Persian text. No text, no letters. "
            "Reply with only the prompt. Text: " + text)
     q = urllib.parse.quote(ask)
     for base in ("https://text.pollinations.ai/", "https://gen.pollinations.ai/text/"):
@@ -231,14 +238,14 @@ def concat_wavs(paths, dst, d):
          "-c", "copy", str(dst)])
 
 
-async def build_scene_audio(idx, chunks, d, min_total=0.0):
+async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL):
     """Return (scene_wav, [(sentence, start, end)], total_duration)."""
     wavs, timing, t = [], [], 0.0
     for j, ch in enumerate(chunks):
         mp3 = d / f"a{idx:02d}_{j:02d}.mp3"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
         await tts(ch, mp3)
-        to_wav(mp3, wav, TAIL if j == len(chunks) - 1 else GAP)
+        to_wav(mp3, wav, tail if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
         timing.append((ch, t, t + dur))
         wavs.append(wav)
@@ -401,22 +408,56 @@ def assemble(clips, durs, voice_wav, music, out):
 
 
 # ---------------------------------------------------------------- main
-async def build(hook, scenes, d, dst):
-    n = len(scenes) + 1
-    # 1) audio: cover first, then scenes
-    audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
+def plan_shots(scenes):
+    """One shot = consecutive sentences that share one picture.
+    A new picture starts when a sentence contains a different keyword."""
+    shots = []
     for i, sc in enumerate(scenes, start=1):
-        audio.append(await build_scene_audio(i, split_chunks(sc["text"]), d))
+        base = image_prompt(sc["title"], sc["text"])
+        cur = None
+        for ch in split_chunks(sc["text"]):
+            prompt = keyword_prompt("", ch) or (cur["prompt"] if cur else base)
+            if cur and prompt == cur["prompt"]:
+                cur["chunks"].append(ch)
+            else:
+                cur = {"scene": i, "title": sc["title"], "prompt": prompt, "chunks": [ch]}
+                shots.append(cur)
+    while len(shots) > MAX_SHOTS:
+        cands = [x for x in range(1, len(shots)) if shots[x]["scene"] == shots[x - 1]["scene"]]
+        if not cands:
+            break
+        j = min(cands, key=lambda x: sum(len(c) for c in shots[x]["chunks"]))
+        shots[j - 1]["chunks"] += shots[j]["chunks"]
+        del shots[j]
+    return shots
 
-    # 2) AI backgrounds (keyword based)
-    images, report = [None], []
-    for i, sc in enumerate(scenes, start=1):
-        path = d / f"ai{i:02d}.jpg"
-        prompt = image_prompt(sc["title"], sc["text"])
-        print(f"scene {i} image prompt: {prompt}")
-        ok = fetch_image(prompt, path, seed=i * 7 + 3)
-        images.append(path if ok else None)
-        report.append("AI image" if ok else "FALLBACK background")
+
+async def build(hook, scenes, d, dst):
+    shots = plan_shots(scenes)
+    n = len(shots) + 1
+
+    # 1) audio: cover first, then every shot
+    audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
+    for k, sh in enumerate(shots, start=1):
+        end_of_scene = k == len(shots) or shots[k]["scene"] != sh["scene"]
+        audio.append(await build_scene_audio(k, sh["chunks"], d,
+                                             tail=TAIL if end_of_scene else GAP))
+
+    # 2) AI photos (two at a time)
+    sem = asyncio.Semaphore(2)
+
+    async def get(k, sh):
+        path = d / f"ai{k:02d}.jpg"
+        async with sem:
+            ok = await asyncio.to_thread(fetch_image, sh["prompt"], path, k * 7 + 3)
+        return path if ok else None
+
+    images = [None] + list(await asyncio.gather(
+        *[get(k, sh) for k, sh in enumerate(shots, start=1)]))
+    report = []
+    for k, sh in enumerate(shots, start=1):
+        print(f"shot {k} (scene {sh['scene']}): {sh['prompt']}")
+        report.append("AI image" if images[k] else "FALLBACK background")
 
     # 3) render all pictures in one browser session
     jobs, bg_pngs, sub_pngs = [], [], []
@@ -424,19 +465,19 @@ async def build(hook, scenes, d, dst):
     jobs.append((cover_html(hook), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
-    for i, sc in enumerate(scenes, start=1):
-        bp = d / f"bg{i:02d}.png"
-        jobs.append((bg_html(images[i], i, len(scenes), sc["title"]), bp, False))
+    for k, sh in enumerate(shots, start=1):
+        bp = d / f"bg{k:02d}.png"
+        jobs.append((bg_html(images[k], sh["scene"], len(scenes), sh["title"]), bp, False))
         bg_pngs.append(bp)
         row = []
-        for j, (txt, a, b) in enumerate(audio[i][1]):
-            sp = d / f"sub{i:02d}_{j:02d}.png"
+        for j, (txt, a, b) in enumerate(audio[k][1]):
+            sp = d / f"sub{k:02d}_{j:02d}.png"
             jobs.append((sub_html(txt), sp, True))
             row.append((sp, a, b))
         sub_pngs.append(row)
     await asyncio.to_thread(render_pages, jobs)
 
-    # 4) one clip per scene, joined with crossfades
+    # 4) one clip per shot, joined with crossfades
     clips, durs = [], []
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
@@ -452,9 +493,9 @@ async def build(hook, scenes, d, dst):
     assemble(clips, durs, voice, music, dst)
     (dst.parent / "cover.png").write_bytes(cover_png.read_bytes())
     total = sum(durs)
-    for i, r in enumerate(report, start=1):
-        print(f"scene {i}: {r}")
-    print(f"Done: {dst} ({n} scenes incl. cover, {total:.1f} s)")
+    for k, r in enumerate(report, start=1):
+        print(f"shot {k}: {r}")
+    print(f"Done: {dst} ({n} clips incl. cover, {total:.1f} s)")
     if total > 90:
         print("WARNING: Instagram API allows Reels up to 90 seconds only.")
 
