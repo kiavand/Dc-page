@@ -34,6 +34,9 @@ USE_DIACRITICS_FOR_VOICE = True   # set False if the voice mispronounces marked 
 GAP = 0.28                       # pause between sentences (s)
 TAIL = 0.45                      # pause at the end of each scene (s)
 COVER_MIN = 2.6                  # minimum cover length (s)
+OUTRO = 2.4                      # end card length (s)
+PAGE_HANDLE = ""                 # e.g. "@your_page" - shown on the end card when set
+MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   # default.png + optional <mood>.png
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
 
@@ -340,25 +343,182 @@ def sub_html(text):
             f"</style></head><body><div class='w'><div class='b'>{html.escape(text)}</div></div></body></html>")
 
 
-def cover_html(hook, tag=None):
+# ---------------------------------------------------------------- mascot
+def sentence_mood(text):
+    t = norm(text)
+    if "؟" in text or "?" in text or any(w in t for w in ("چرا", "چطور", "چگونه", "آیا", "کدام")):
+        return "question"
+    if any(w in t for w in ("ذخیره", "بفرست", "دنبال", "کامنت", "نظرت", "اشتراک")):
+        return "love"
+    if any(w in t for w in ("موفق", "پیروز", "برنده", "تبریک", "رسیدی", "جشن", "قهرمان", "دستاورد")):
+        return "celebrate"
+    if any(w in t for w in ("ایده", "راز", "نکته", "راهحل", "کلید", "یادبگیر", "بدان")):
+        return "idea"
+    if any(w in t for w in ("شکست", "ناامید", "سخت", "مشکل", "اشتباه", "تنها", "ترس", "نگران", "استرس", "درد")):
+        return "worried"
+    if "!" in text or any(w in t for w in ("باورنکردنی", "عالی", "شگفت", "فوقالعاده")):
+        return "excited"
+    return "talk"
+
+
+def mood_runs(timing):
+    """Merge consecutive sentences with the same mood: [[mood, start, end], ...]."""
+    runs = []
+    for txt, a, b in timing:
+        m = sentence_mood(txt)
+        if runs and runs[-1][0] == m:
+            runs[-1][2] = b
+        else:
+            runs.append([m, a, b])
+    return runs
+
+
+def mascot_file(mood):
+    for name in (mood, "default"):
+        for folder in (MASCOT_DIR, MASCOT_DIR.parent):
+            f = folder / f"{name}.png"
+            if f.exists():
+                return f
+    return None
+
+
+def key_background(im):
+    """Make a flat-colour background transparent (for poses without transparency)."""
+    from PIL import Image, ImageDraw, ImageFilter
+    w, h = im.size
+    work, marker = im.convert("RGB"), (255, 0, 255)
+    for pt in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        if work.getpixel(pt) != marker:
+            ImageDraw.floodfill(work, pt, marker, thresh=45)
+    mask = Image.new("L", (w, h), 255)
+    px, mp = work.load(), mask.load()
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] == marker:
+                mp[x, y] = 0
+    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1.2))
+    out = im.convert("RGBA")
+    out.putalpha(mask)
+    return out
+
+
+_URI_CACHE = {}
+
+
+def mascot_uri(mood):
+    path = mascot_file(mood)
+    if not path:
+        return None
+    if path in _URI_CACHE:
+        return _URI_CACHE[path]
+    data = path.read_bytes()
+    try:
+        import io
+        from PIL import Image
+        im = Image.open(io.BytesIO(data))
+        if im.mode != "RGBA" or im.getchannel("A").getextrema()[0] > 250:
+            buf = io.BytesIO()
+            key_background(im).save(buf, "PNG")
+            data = buf.getvalue()
+    except ImportError:
+        pass
+    uri = "data:image/png;base64," + base64.b64encode(data).decode()
+    _URI_CACHE[path] = uri
+    return uri
+
+
+SPARK = ("<svg class='pr' viewBox='0 0 64 64' style='{pos}' width='{sz}' height='{sz}'>"
+         "<path d='M32 2 L39 25 L62 32 L39 39 L32 62 L25 39 L2 32 L25 25 Z' fill='{col}'/></svg>")
+HEART = ("<svg class='pr' viewBox='0 0 64 64' style='{pos}' width='{sz}' height='{sz}'>"
+         "<path d='M32 58 C6 40 2 22 13 13 C21 7 30 11 32 18 C34 11 43 7 51 13 C62 22 58 40 32 58Z' "
+         "fill='{col}'/></svg>")
+PROPS = {
+    "question": "<div class='pr bub' style='left:-60px;top:-70px;width:170px;height:170px;"
+                "background:#fbbf24;color:#111;font-size:130px;transform:rotate(-12deg)'>؟</div>",
+    "excited": "<div class='pr bub' style='left:-60px;top:-70px;width:160px;height:160px;"
+               "background:#fb923c;color:#fff;font-size:130px;transform:rotate(-10deg)'>!</div>"
+               + SPARK.format(pos="right:-20px;top:-40px", sz=90, col="#fde047")
+               + SPARK.format(pos="right:60px;top:-90px", sz=50, col="#ffffff"),
+    "idea": "<svg class='pr' viewBox='0 0 64 64' style='left:-50px;top:-90px' width='190' height='190'>"
+            "<circle cx='32' cy='26' r='20' fill='#fde047'/><rect x='24' y='44' width='16' height='10' rx='3' "
+            "fill='#facc15'/><rect x='26' y='55' width='12' height='5' rx='2.5' fill='#a16207'/>"
+            "<path d='M32 8v-6M10 26H4M60 26h-6M16 10l-4-4M48 10l4-4' stroke='#fde047' stroke-width='3' "
+            "stroke-linecap='round'/></svg>",
+    "celebrate": SPARK.format(pos="left:-50px;top:-30px", sz=110, col="#fde047")
+                 + SPARK.format(pos="right:-30px;top:-70px", sz=130, col="#fbbf24")
+                 + SPARK.format(pos="left:60px;top:-100px", sz=60, col="#ffffff")
+                 + SPARK.format(pos="right:90px;top:-110px", sz=45, col="#f472b6")
+                 + SPARK.format(pos="right:-10px;top:150px", sz=70, col="#60a5fa"),
+    "worried": "<svg class='pr' viewBox='0 0 64 64' style='right:10px;top:10px' width='110' height='110'>"
+               "<path d='M32 4 C32 4 12 30 12 42 a20 20 0 0 0 40 0 C52 30 32 4 32 4Z' fill='#60a5fa'/>"
+               "<path d='M24 40 a8 8 0 0 0 8 8' stroke='#fff' stroke-width='3' fill='none' "
+               "stroke-linecap='round' opacity='.7'/></svg>",
+    "love": HEART.format(pos="left:-50px;top:-50px", sz=120, col="#ef4444")
+            + HEART.format(pos="right:-30px;top:-90px", sz=90, col="#f472b6")
+            + HEART.format(pos="left:90px;top:-120px", sz=60, col="#fb7185"),
+    "talk": "",
+}
+MASCOT_CSS = (".mw{position:absolute}.mi{width:100%;display:block}"
+              ".pr{position:absolute}"
+              ".bub{display:flex;align-items:center;justify-content:center;border-radius:50%;"
+              f"font-family:{FONT};font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.35)}}")
+
+
+def mascot_block(mood, uri, width=440, style=""):
+    if not uri:
+        return ""
+    tilt = {"question": -5, "worried": 4, "idea": 3}.get(mood, 0)
+    filt = "drop-shadow(0 14px 22px rgba(0,0,0,.45))"
+    if mood == "worried":
+        filt += " saturate(.88) brightness(.95)"
+    return (f"<div class='mw' style='width:{width}px;{style}'>"
+            f"<img class='mi' src='{uri}' style='transform:rotate({tilt}deg);filter:{filt}'>"
+            f"{PROPS.get(mood, '')}</div>")
+
+
+def mascot_layer_html(mood):
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent}}{MASCOT_CSS}"
+            f"</style></head><body>{mascot_block(mood, mascot_uri(mood), 440, 'right:30px;top:440px')}</body></html>")
+
+
+def cover_html(hook, tag=None, mascot=False):
     hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
     n = len(hook)
-    size = 118 if n < 30 else 98 if n < 55 else 82
+    size = 112 if n < 30 else 94 if n < 55 else 80
+    lion = mascot_block("default", mascot_uri("default"), 470, "position:relative;margin:30px auto 0") if mascot else ""
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}{MASCOT_CSS}"
             f"body{{background:{MESH};font-family:{FONT};color:#fff;display:flex;"
             f"flex-direction:column;align-items:center;justify-content:center;text-align:center}}"
-            f".tag{{background:#fbbf24;color:#111;font-weight:800;font-size:48px;"
-            f"padding:12px 46px;border-radius:60px;margin-bottom:60px}}"
-            f".card{{margin:0 70px;padding:100px 60px;border-radius:70px;"
+            f".tag{{background:#fbbf24;color:#111;font-weight:800;font-size:46px;"
+            f"padding:12px 46px;border-radius:60px;margin-bottom:50px}}"
+            f".card{{margin:0 70px;padding:80px 56px;border-radius:70px;"
             f"background:rgba(255,255,255,.09);border:2px solid rgba(255,255,255,.28)}}"
             f".h{{font-weight:800;font-size:{size}px;line-height:1.6}}"
-            f".bar{{width:240px;height:14px;background:#fbbf24;border-radius:8px;margin:60px auto 0}}"
-            f".f{{position:absolute;bottom:260px;left:0;right:0;font-size:46px;"
+            f".bar{{width:220px;height:14px;background:#fbbf24;border-radius:8px;margin:44px auto 0}}"
+            f".f{{position:absolute;bottom:130px;left:0;right:0;font-size:44px;"
             f"font-weight:500;color:#e2e8f0}}"
             f"</style></head><body><div class='tag'>{html.escape(tag)}</div>"
             f"<div class='card'><div class='h'>{html.escape(hook)}</div><div class='bar'></div></div>"
-            f"<div class='f'>{html.escape(COVER_FOOT)}</div></body></html>")
+            f"{lion}<div class='f'>{html.escape(COVER_FOOT)}</div></body></html>")
+
+
+def outro_html(mascot=False):
+    lion = mascot_block("love", mascot_uri("love"), 440, "position:relative;margin:0 auto 40px") if mascot else ""
+    handle = (f"<div class='hd'>{html.escape(PAGE_HANDLE)}</div>" if PAGE_HANDLE else "")
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}{MASCOT_CSS}"
+            f"body{{background:{MESH};font-family:{FONT};color:#fff;display:flex;"
+            f"flex-direction:column;align-items:center;justify-content:center;text-align:center}}"
+            f".t{{font-weight:800;font-size:76px;line-height:1.6;padding:0 80px}}"
+            f".b{{background:#fbbf24;color:#111;font-weight:800;font-size:58px;padding:16px 64px;"
+            f"border-radius:70px;margin-top:40px}}"
+            f".hd{{font-size:52px;margin-top:36px;color:#e2e8f0;direction:ltr}}"
+            f".s{{font-size:42px;margin-top:40px;color:#cbd5e1}}"
+            f"</style></head><body>{lion}<div class='t'>اگر به کارت آمد</div>"
+            f"<div class='b'>دنبال کن</div>{handle}"
+            f"<div class='s'>{html.escape(COVER_FOOT)}</div></body></html>")
 
 
 def render_pages(jobs):
@@ -375,7 +535,7 @@ def render_pages(jobs):
 
 
 # ---------------------------------------------------------------- video
-def scene_video(idx, bg_png, subs, dur, is_last, out):
+def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
     """bg with slow zoom + timed subtitle overlays. subs: [(png, start, end)]."""
     length = dur + (0 if is_last else XFADE)
     frames = int(length * FPS) + 2
@@ -385,12 +545,17 @@ def scene_video(idx, bg_png, subs, dur, is_last, out):
     else:
         z = f"if(eq(on,0),1.12,max(zoom-{inc:.6f},1.0))"
     cmd = ["ffmpeg", "-y", "-i", str(bg_png)]
-    for png, _, _ in subs:
+    for png, _, _ in list(mascots) + list(subs):
         cmd += ["-i", str(png)]
     fc = (f"[0:v]scale={W*2}:{H*2},zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last = "v0"
-    for k, (_, a, b) in enumerate(subs, start=1):
+    for k, (_, a, b) in enumerate(mascots, start=1):
+        fc += (f";[{last}][{k}:v]overlay=x=0:y='14*sin(2*PI*(t-{a:.3f})/1.8)':"
+               f"enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
+        last = f"v{k}"
+    base = len(mascots)
+    for k, (_, a, b) in enumerate(subs, start=base + 1):
         fc += f";[{last}][{k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]"
         last = f"v{k}"
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
@@ -428,9 +593,10 @@ def assemble(clips, durs, voice_wav, music, out):
     if music:
         fc += (f"[{vi+1}:a]volume={MUSIC_VOLUME},afade=t=in:d=1,"
                f"afade=t=out:st={max(total-1.5,0):.3f}:d=1.5[m];"
-               f"[{vi}:a][m]amix=inputs=2:duration=first:normalize=0[aout]")
+               f"[{vi}:a][m]amix=inputs=2:duration=first:normalize=0[mix];"
+               f"[mix]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
     else:
-        fc += f"[{vi}:a]anull[aout]"
+        fc += f"[{vi}:a]loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
     cmd += ["-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
             "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", "veryfast",
             "-crf", "20", "-pix_fmt", "yuv420p", "-r", str(FPS),
@@ -465,7 +631,7 @@ def plan_shots(scenes):
 
 async def build(hook, scenes, d, dst, tag=None):
     shots = plan_shots(scenes)
-    n = len(shots) + 1
+    use_mascot = mascot_file('default') is not None
 
     # 1) audio: cover first, then every shot
     audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
@@ -473,6 +639,11 @@ async def build(hook, scenes, d, dst, tag=None):
         end_of_scene = k == len(shots) or shots[k]["scene"] != sh["scene"]
         audio.append(await build_scene_audio(k, sh["chunks"], d,
                                              tail=TAIL if end_of_scene else GAP))
+
+    outro_wav = d / "outro.wav"
+    silence_wav(outro_wav, OUTRO)
+    audio.append((outro_wav, [], duration(outro_wav)))
+    n = len(audio)
 
     # 2) AI photos (two at a time)
     sem = asyncio.Semaphore(2)
@@ -493,9 +664,16 @@ async def build(hook, scenes, d, dst, tag=None):
     # 3) render all pictures in one browser session
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook, tag), cover_png, False))
+    jobs.append((cover_html(hook, tag, use_mascot), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
+    mascot_rows = [[]]
+    mood_png = {}
+    for k in range(1, len(shots) + 1):
+        for m, _, _ in mood_runs(audio[k][1]):
+            if use_mascot and m not in mood_png:
+                mood_png[m] = d / f"mas_{m}.png"
+                jobs.append((mascot_layer_html(m), mood_png[m], True))
     for k, sh in enumerate(shots, start=1):
         bp = d / f"bg{k:02d}.png"
         jobs.append((bg_html(images[k], sh["scene"], len(scenes), sh["title"]), bp, False))
@@ -506,6 +684,12 @@ async def build(hook, scenes, d, dst, tag=None):
             jobs.append((sub_html(txt), sp, True))
             row.append((sp, a, b))
         sub_pngs.append(row)
+        mascot_rows.append([(mood_png[m], a, b) for m, a, b in mood_runs(audio[k][1])] if use_mascot else [])
+    outro_png = d / "outro.png"
+    jobs.append((outro_html(use_mascot), outro_png, False))
+    bg_pngs.append(outro_png)
+    sub_pngs.append([])
+    mascot_rows.append([])
     await asyncio.to_thread(render_pages, jobs)
 
     # 4) one clip per shot, joined with crossfades
@@ -513,7 +697,7 @@ async def build(hook, scenes, d, dst, tag=None):
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
         dur = audio[i][2]
-        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip)
+        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip, mascot_rows[i])
         clips.append(clip)
         durs.append(dur)
     voice = d / "voice.wav"
@@ -528,7 +712,7 @@ async def build(hook, scenes, d, dst, tag=None):
         print(f"shot {k}: {r}")
     print(f"Done: {dst} ({n} clips incl. cover, {total:.1f} s)")
     if total > 90:
-        print("WARNING: Instagram API allows Reels up to 90 seconds only.")
+        print("NOTE: this reel is longer than 90 seconds; shorter reels usually keep viewers better.")
 
 
 def main():
