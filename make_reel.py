@@ -373,12 +373,29 @@ def mood_runs(timing):
     return runs
 
 
+POSE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+POSE_NAMES = ("default", "talk", "question", "idea", "excited", "celebrate", "worried", "love")
+
+
+def scan_mascots():
+    """Find pose files (name = mood, any letter case) in the 'mascot' folder or the repo root."""
+    found = {}
+    for folder in (MASCOT_DIR, MASCOT_DIR.parent):
+        if not folder.is_dir():
+            continue
+        for f in sorted(folder.iterdir()):
+            if f.is_file() and f.suffix.lower() in POSE_EXT:
+                stem = f.stem.strip().lower()
+                if stem in POSE_NAMES and stem not in found:
+                    found[stem] = f
+    return found
+
+
 def mascot_file(mood):
-    for name in (mood, "default"):
-        for folder in (MASCOT_DIR, MASCOT_DIR.parent):
-            f = folder / f"{name}.png"
-            if f.exists():
-                return f
+    found = scan_mascots()
+    for name in (mood, "default") + POSE_NAMES:
+        if name in found:
+            return found[name]
     return None
 
 
@@ -631,7 +648,9 @@ def plan_shots(scenes):
 
 async def build(hook, scenes, d, dst, tag=None):
     shots = plan_shots(scenes)
-    use_mascot = mascot_file('default') is not None
+    found_poses = scan_mascots()
+    use_mascot = bool(found_poses)
+    print('MASCOT: found=' + (','.join(found_poses) if found_poses else 'none'))
 
     # 1) audio: cover first, then every shot
     audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
@@ -685,6 +704,7 @@ async def build(hook, scenes, d, dst, tag=None):
             row.append((sp, a, b))
         sub_pngs.append(row)
         mascot_rows.append([(mood_png[m], a, b) for m, a, b in mood_runs(audio[k][1])] if use_mascot else [])
+    print("MASCOT: used=" + (",".join(sorted(mood_png)) if mood_png else "none"))
     outro_png = d / "outro.png"
     jobs.append((outro_html(use_mascot), outro_png, False))
     bg_pngs.append(outro_png)
