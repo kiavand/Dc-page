@@ -505,8 +505,16 @@ def mascot_layer_html(mood):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
+    
     hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
+    cover_bg = (
+        f"background-image:linear-gradient(rgba(0,0,0,.48),rgba(0,0,0,.78)),"
+        f"url('data:image/jpeg;base64,{base64.b64encode(cover_image.read_bytes()).decode()}');"
+        if cover_image and cover_image.exists()
+        else f"background:{MESH};"
+    )
     n = len(hook)
+
     size = 112 if n < 30 else 94 if n < 55 else 80
 
     return (
