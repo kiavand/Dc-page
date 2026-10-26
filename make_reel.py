@@ -665,6 +665,19 @@ async def build(hook, scenes, d, dst, tag=None):
     audio.append((outro_wav, [], duration(outro_wav)))
     n = len(audio)
 
+    # Generate a dedicated AI image for the cover
+    cover_image = d / "cover_ai.jpg"
+    cover_prompt = (
+        image_prompt(hook, hook)
+        + ", cinematic editorial cover image, dramatic black background, "
+        "golden yellow highlights, strong visual subject, "
+        "high contrast, no text, no letters, no logos"
+    )
+    cover_ok = await asyncio.to_thread(
+        fetch_image, cover_prompt, cover_image, 2026
+    )
+    print("COVER AI IMAGE:", "generated" if cover_ok else "fallback")
+  
     # 2) AI photos (two at a time)
     sem = asyncio.Semaphore(2)
 
