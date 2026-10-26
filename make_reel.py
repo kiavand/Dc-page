@@ -522,7 +522,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"<meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
-        f"body{{background:{MESH};font-family:{FONT};color:#fff;"
+        f"body{{{cover_bg}font-family:{FONT};color:#fff;"
         f"display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;text-align:center;position:relative}}"
         f".tag{{background:#facc15;color:#080808;font-weight:800;"
