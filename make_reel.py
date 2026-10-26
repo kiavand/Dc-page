@@ -705,7 +705,7 @@ async def build(hook, scenes, d, dst, tag=None):
     # 3) render all pictures in one browser session
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook, tag, use_mascot), cover_png, False))
+    jobs.append((cover_html(hook, tag, use_mascot, cover_image if cover_ok else None), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
     mascot_rows = [[]]
