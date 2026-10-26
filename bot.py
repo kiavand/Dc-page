@@ -396,6 +396,18 @@ def shrink_if_needed(path):
     return small if small.exists() else path
 
 
+def mascot_report(log):
+    found = re.search(r"^MASCOT: found=(.*)$", log, re.M)
+    used = re.search(r"^MASCOT: used=(.*)$", log, re.M)
+    if not found or found.group(1).strip() == "none":
+        return ("🦁 هیچ فایل تصویر شیر پیدا نشد. فایل‌ها باید توی صفحه‌ی اصلی ریپو یا پوشه‌ی mascot باشن "
+                "و اسمشون مثل question.png یا default.png باشه (حروف انگلیسی).")
+    text = "🦁 فایل‌های شیر که پیدا شد: " + found.group(1).strip()
+    if used and used.group(1).strip() != "none":
+        text += "\nحالت‌های استفاده‌شده در این ویدیو: " + used.group(1).strip()
+    return text
+
+
 def send_results(job, video, log):
     video = shrink_if_needed(video)
     ok = curl_send("sendVideo", "video", video,
@@ -405,6 +417,7 @@ def send_results(job, video, log):
         return
     fallbacks = len(re.findall(r"FALLBACK", log))
     note = f"\n\n⚠️ برای {fallbacks} تصویر، عکس هوش مصنوعی نیومد و پس‌زمینه ساده گذاشته شد." if fallbacks else ""
+    say(mascot_report(log))
     say("کپشن پیشنهادی (روش نگه دار و کپی کن):" + note)
     say(make_caption(job.read_text(encoding="utf-8")))
 
