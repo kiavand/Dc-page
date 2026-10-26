@@ -503,43 +503,40 @@ def mascot_layer_html(mood):
             f"</style></head><body>{mascot_block(mood, mascot_uri(mood), 440, 'right:30px;top:440px')}</body></html>")
 
 
+
 def cover_html(hook, tag=None, mascot=False):
     hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
     n = len(hook)
     size = 112 if n < 30 else 94 if n < 55 else 80
-    lion = mascot_block("default", mascot_uri("default"), 470, "position:relative;margin:30px auto 0") if mascot else ""
-    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}{MASCOT_CSS}"
-            f"body{{background:{MESH};font-family:{FONT};color:#fff;display:flex;"
-            f"flex-direction:column;align-items:center;justify-content:center;text-align:center}}"
-            f".tag{{background:#fbbf24;color:#111;font-weight:800;font-size:46px;"
-            f"padding:12px 46px;border-radius:60px;margin-bottom:50px}}"
-            f".card{{margin:0 70px;padding:80px 56px;border-radius:70px;"
-            f"background:rgba(255,255,255,.09);border:2px solid rgba(255,255,255,.28)}}"
-            f".h{{font-weight:800;font-size:{size}px;line-height:1.6}}"
-            f".bar{{width:220px;height:14px;background:#fbbf24;border-radius:8px;margin:44px auto 0}}"
-            f".f{{position:absolute;bottom:130px;left:0;right:0;font-size:44px;"
-            f"font-weight:500;color:#e2e8f0}}"
-            f"</style></head><body><div class='tag'>{html.escape(tag)}</div>"
-            f"<div class='card'><div class='h'>{html.escape(hook)}</div><div class='bar'></div></div>"
-            f"{lion}<div class='f'>{html.escape(COVER_FOOT)}</div></body></html>")
 
+    return (
+        f"<!doctype html><html lang='fa' dir='rtl'><head>"
+        f"<meta charset='utf-8'>{FONT_LINK}"
+        f"<style>"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
+        f"body{{background:{MESH};font-family:{FONT};color:#fff;"
+        f"display:flex;flex-direction:column;align-items:center;"
+        f"justify-content:center;text-align:center;position:relative}}"
+        f".tag{{background:#facc15;color:#080808;font-weight:800;"
+        f"font-size:46px;padding:12px 46px;border-radius:60px;"
+        f"margin-bottom:50px}}"
+        f".card{{margin:0 70px;padding:80px 56px;border-radius:50px;"
+        f"background:rgba(255,255,255,.06);"
+        f"border:2px solid rgba(250,204,21,.55);"
+        f"box-shadow:0 20px 80px rgba(0,0,0,.35)}}"
+        f".h{{font-weight:800;font-size:{size}px;line-height:1.6}}"
+        f".bar{{width:220px;height:14px;background:#facc15;"
+        f"border-radius:8px;margin:44px auto 0}}"
+        f".f{{position:absolute;bottom:130px;left:0;right:0;"
+        f"font-size:44px;font-weight:500;color:#fff}}"
+        f"</style></head><body>"
+        f"<div class='tag'>{html.escape(tag)}</div>"
+        f"<div class='card'><div class='h'>{html.escape(hook)}</div>"
+        f"<div class='bar'></div></div>"
+        f"<div class='f'>{html.escape(COVER_FOOT)}</div>"
+        f"</body></html>"
+    )
 
-def outro_html(mascot=False):
-    lion = mascot_block("love", mascot_uri("love"), 440, "position:relative;margin:0 auto 40px") if mascot else ""
-    handle = (f"<div class='hd'>{html.escape(PAGE_HANDLE)}</div>" if PAGE_HANDLE else "")
-    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}{MASCOT_CSS}"
-            f"body{{background:{MESH};font-family:{FONT};color:#fff;display:flex;"
-            f"flex-direction:column;align-items:center;justify-content:center;text-align:center}}"
-            f".t{{font-weight:800;font-size:76px;line-height:1.6;padding:0 80px}}"
-            f".b{{background:#fbbf24;color:#111;font-weight:800;font-size:58px;padding:16px 64px;"
-            f"border-radius:70px;margin-top:40px}}"
-            f".hd{{font-size:52px;margin-top:36px;color:#e2e8f0;direction:ltr}}"
-            f".s{{font-size:42px;margin-top:40px;color:#cbd5e1}}"
-            f"</style></head><body>{lion}<div class='t'>اگر به کارت آمد</div>"
-            f"<div class='b'>دنبال کن</div>{handle}"
-            f"<div class='s'>{html.escape(COVER_FOOT)}</div></body></html>")
 
 
 def render_pages(jobs):
