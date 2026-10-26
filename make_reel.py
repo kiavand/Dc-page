@@ -504,7 +504,7 @@ def mascot_layer_html(mood):
 
 
 
-def cover_html(hook, tag=None, mascot=False):
+def cover_html(hook, tag=None, mascot=False, cover_image=None):
     hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
     n = len(hook)
     size = 112 if n < 30 else 94 if n < 55 else 80
