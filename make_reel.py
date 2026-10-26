@@ -297,9 +297,13 @@ def img_b64(path):
     return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
 
-MESH = ("radial-gradient(circle at 18% 14%,rgba(124,58,237,.80),transparent 46%),"
-        "radial-gradient(circle at 88% 42%,rgba(251,191,36,.45),transparent 40%),"
-        "radial-gradient(circle at 28% 88%,rgba(14,165,233,.62),transparent 46%),#0b1020")
+
+MESH = (
+    "radial-gradient(circle at 82% 18%,rgba(250,204,21,.18),transparent 32%),"
+    "radial-gradient(circle at 12% 82%,rgba(255,255,255,.06),transparent 38%),"
+    "#080808"
+)
+
 
 
 def bg_html(image_path, idx, total, title):
