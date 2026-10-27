@@ -6,7 +6,7 @@ Input file (input.txt):
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds are AI images chosen from the keywords of each scene.
+Scenes use a pure-black background and animated semantic vector icons.
 
 Optional music: put royalty-free .mp3/.wav files in the repo (root or "music"
 folder); one is mixed quietly under the voice.
@@ -57,16 +57,6 @@ FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
 
 # keyword (Persian, without half-spaces) -> visual prompt. First match wins.
 KEYWORDS = [
-    (("بلاکچین", "بلاک چین", "قرارداد هوشمند", "غیرمتمرکز", "شبکه بلاکچین"),
-     "cinematic realistic photo of a smartphone displaying abstract blockchain network nodes, connected glowing blocks, black background with restrained golden yellow highlights, no readable text"),
-    (("تبلیغات", "تبلیغ", "بازاریابی", "مشتری", "فروش"),
-     "realistic photo of a small marketing team reviewing a digital campaign on a laptop, modern workspace, black and golden yellow accents, no readable text"),
-    (("درآمد", "پول", "سرمایه", "مالی", "سود"),
-     "realistic close-up photo of a person reviewing finances and charts on a laptop at a desk, subtle golden light, no readable text"),
-    (("هوش مصنوعی", "هوشمصنوعی", "هوش", "الگوریتم"),
-     "realistic photo of a professional using an AI analytics interface on a laptop, abstract data visualization, dark workspace with golden highlights, no readable text"),
-    (("امنیت", "امن", "کیف پول", "ولت", "رمزارز", "ارز دیجیتال", "بیتکوین", "بیت کوین"),
-     "realistic close-up of a smartphone and laptop showing abstract secure digital finance interface, shield motif, dark background with golden highlights, no readable text"),
     (("ثبتنام", "عضویت", "فرم"),
      "candid photo of two people at a desk filling out a registration form together, friendly consultant, bright modern office"),
     (("تیمسازی", "تیم", "همتیم"),
@@ -213,40 +203,7 @@ def llm_prompt(text):
 
 
 def image_prompt(title, text):
-    # Prefer a concrete, topic-matched visual over the same generic office image.
-    prompt = keyword_prompt(title, text)
-    if prompt:
-        return prompt
-    prompt = llm_prompt(text)
-    if prompt:
-        return prompt
-    # Offline/service-failure fallback: choose a relevant visual from the text
-    # rather than repeating the same generic image in every scene.
-    n = norm((title or "") + " " + (text or ""))
-    fallbacks = [
-        (("تلفن", "پیام", "آنلاین", "اینترنت", "فضای مجازی"),
-         "realistic photo of a person using a smartphone in a modern workspace, dark background, golden yellow accent lighting"),
-        (("هدف", "برنامه", "برنامهریزی", "زمان", "روزانه"),
-         "realistic close-up photo of a planner, pen and hands organizing a weekly plan on a desk, warm golden light"),
-        (("تیم", "همکاری", "گروه", "نتورک"),
-         "realistic photo of a small diverse team collaborating around a table, candid expressions, modern office"),
-        (("یادگیری", "آموزش", "مهارت", "دانش"),
-         "realistic photo of a person learning from a laptop with a notebook open, focused expression, modern desk"),
-        (("تصمیم", "انتخاب", "مسیر", "شروع"),
-         "realistic photo of a thoughtful professional standing by a window in a modern office, cinematic natural light"),
-    ]
-    for keys, visual in fallbacks:
-        if any(k in n for k in keys):
-            return visual
-    # Stable but varied fallbacks for otherwise unmatched text.
-    options = [
-        "realistic photo of a professional discussing an idea with a colleague in a modern workspace, natural light",
-        "realistic photo of hands arranging notes and a smartphone on a desk, cinematic close-up",
-        "realistic photo of a focused person looking at a laptop in a quiet modern workspace, soft natural light",
-        "realistic photo of two colleagues brainstorming beside a whiteboard, candid documentary photography",
-    ]
-    index = int(hashlib.md5(n.encode("utf-8")).hexdigest(), 16) % len(options)
-    return options[index]
+    return keyword_prompt(title, text) or llm_prompt(text) or FALLBACK_PROMPT
 
 
 def fetch_image(prompt, path, seed):
@@ -341,54 +298,101 @@ def img_b64(path):
 
 
 
-MESH = (
-    "radial-gradient(circle at 82% 18%,rgba(250,204,21,.18),transparent 32%),"
-    "radial-gradient(circle at 12% 82%,rgba(255,255,255,.06),transparent 38%),"
-    "#080808"
-)
+MESH = "#000000"
 
+# Minimal white SVG line icons. No downloaded images or external icon libraries.
+ICON_ART = {
+    "brain": '<path d="M50 18c-10-12-26-4-24 8-12 2-15 18-5 24-8 10 0 24 11 23 2 13 17 15 22 5V24c0-3-1-5-4-6Z"/><path d="M50 18c10-12 26-4 24 8 12 2 15 18 5 24 8 10 0 24-11 23-2 13-17 15-22 5V24"/><path d="M31 31c8 0 10 7 8 12m-17 7c9-2 13 3 12 10m10-33c-2 7 1 12 6 13m19-9c-8 0-10 7-8 12m17 7c-9-2-13 3-12 10M50 40v30"/>',
+    "money": '<rect x="14" y="27" width="72" height="46" rx="5"/><circle cx="50" cy="50" r="14"/><path d="M23 35h8m41 30h8M50 40v20m-6-15c4-5 13-3 13 2s-14 3-14 8 10 8 14 2"/>',
+    "target": '<circle cx="50" cy="50" r="35"/><circle cx="50" cy="50" r="22"/><circle cx="50" cy="50" r="8"/><path d="m52 48 27-27m-12 0h12v12"/>',
+    "growth": '<path d="M16 80V20M16 80h70"/><path d="m25 67 18-19 14 9 25-31"/><path d="M67 26h15v15"/>',
+    "team": '<circle cx="50" cy="28" r="12"/><circle cx="25" cy="40" r="9"/><circle cx="75" cy="40" r="9"/><path d="M27 79V69c0-12 10-21 23-21s23 9 23 21v10M8 77v-8c0-9 7-16 17-16m67 24v-8c0-9-7-16-17-16"/>',
+    "book": '<path d="M12 23c16-7 29-4 38 5v53c-9-9-22-12-38-5zM88 23c-16-7-29-4-38 5v53c9-9 22-12 38-5z"/><path d="M22 35c8-2 15 0 20 4M22 47c8-2 15 0 20 4M78 35c-8-2-15 0-20 4M78 47c-8-2-15 0-20 4"/>',
+    "heart": '<path d="M50 79 18 49C-2 27 23 8 40 25l10 10 10-10c17-17 42 2 22 24z"/>',
+    "clock": '<circle cx="50" cy="50" r="36"/><path d="M50 28v24l17 10"/>',
+    "shield": '<path d="M50 12 80 24v22c0 20-13 33-30 42-17-9-30-22-30-42V24z"/><path d="m34 49 11 11 22-24"/>',
+    "chat": '<path d="M15 20h70v48H48L29 82V68H15z"/><path d="M30 36h40M30 48h28"/>',
+    "light": '<path d="M34 61c-4-6-10-12-10-23a26 26 0 0 1 52 0c0 11-6 17-10 23l-3 8H37zM39 79h22M42 88h16"/><path d="M50 3v8M10 38H2m96 0h-8M17 12l6 6m60-6-6 6"/>',
+    "generic": '<circle cx="50" cy="50" r="35"/><path d="M50 27v26m0 17h.1"/>'
+}
 
+ICON_RULES = [
+    ("brain", ("ذهن", "فکر", "تمرکز", "باور", "نگرش", "روان", "استرس", "ترس", "ذهنیت", "انگیزه", "مثبت")),
+    ("money", ("پول", "ثروت", "درآمد", "سرمایه", "مالی", "اقتصاد", "فروش", "سود", "بانک", "قیمت", "حقوق", "بیزینس", "کسبوکار", "ثروتمند")),
+    ("target", ("هدف", "برنامه", "موفقیت", "مسیر", "تصمیم", "تعهد", "اولویت", "آینده", "رسیدن")),
+    ("growth", ("رشد", "پیشرفت", "افزایش", "توسعه", "یادگیری", "مهارت", "نتیجه", "تغییر", "ساختن")),
+    ("team", ("تیم", "نتورک", "شبکه", "رهبری", "همکاری", "ارتباط", "مخاطب", "مشتری", "دعوت", "فروشنده")),
+    ("book", ("آموزش", "دانش", "کتاب", "یادبگیر", "درس", "تجربه", "علم", "تحلیل", "مطالعه")),
+    ("heart", ("عشق", "رابطه", "احساس", "خانواده", "دوست", "اعتماد", "احترام", "زندگی")),
+    ("clock", ("زمان", "وقت", "عادت", "روز", "صبر", "تأخیر", "تنبلی", "نظم")),
+    ("shield", ("امنیت", "ریسک", "خطر", "حفاظت", "اعتماد", "اشتباه", "اشتباهات")),
+    ("chat", ("صحبت", "گفتگو", "ارتباط", "کلام", "بیان", "مذاکره", "متقاعد")),
+    ("light", ("ایده", "خلاق", "فهم", "راز", "نکته", "هوش", "راهکار", "ترفند")),
+]
+
+def choose_icon(text):
+    t = norm(text)
+    for name, words in ICON_RULES:
+        if any(norm(w) in t for w in words):
+            return name
+    return "generic"
+
+def cover_word(hook, tag=None):
+    t = norm((hook or "") + " " + (tag or ""))
+    choices = [
+        ("موفقیت", ("موفق", "هدف", "پیشرفت")),
+        ("ثروت", ("ثروت", "پول", "درآمد", "سرمایه", "مالی")),
+        ("ذهنیت", ("ذهن", "فکر", "باور", "انگیزه", "مثبت")),
+        ("آموزش", ("آموزش", "یادگیری", "درس", "نکته")),
+        ("رشد", ("رشد", "توسعه", "مهارت")),
+        ("تیم‌سازی", ("تیم", "نتورک", "شبکه")),
+        ("روابط", ("رابطه", "اعتماد", "ارتباط", "خانواده")),
+    ]
+    for word, keys in choices:
+        if any(norm(k) in t for k in keys):
+            return word
+    return "انگیزه"
 
 def bg_html(image_path, idx, total, title):
-    bg = (f"#0b1020 url({img_b64(image_path)}) center/cover no-repeat"
-          if image_path else MESH)
-    segs = "".join(f"<i class='{'on' if k <= idx else ''}'></i>" for k in range(1, total + 1))
-    title = strip_marks(title)
-    t = f"<div class='t'><span>{html.escape(title)}</span></div>" if title else ""
-    deco = ""
-    if not image_path:
-        deco = ("<div class='r1'></div><div class='r2'></div><div class='r3'></div>"
-                + (f"<div class='big'>{html.escape(title)}</div>" if title else ""))
+    icon = title if title in ICON_ART else choose_icon(title or "")
+    art = ICON_ART.get(icon, ICON_ART["generic"])
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
-            f"body{{background:{bg}}}"
-            f".s{{position:absolute;inset:0;background:linear-gradient(to bottom,"
-            f"rgba(0,0,0,.38),rgba(0,0,0,0) 28%,rgba(0,0,0,0) 50%,rgba(0,0,0,.72))}}"
-            f".p{{position:absolute;top:110px;left:70px;right:70px;display:flex;gap:10px;direction:rtl}}"
-            f".p i{{flex:1;height:8px;border-radius:6px;background:rgba(255,255,255,.35)}}"
-            f".p i.on{{background:#fbbf24}}"
-            f".t{{position:absolute;top:190px;left:0;right:0;text-align:center}}"
-            f".t span{{display:inline-block;background:rgba(255,255,255,.20);"
-            f"border:2px solid rgba(255,255,255,.40);color:#fff;font-family:{FONT};"
-            f"font-weight:800;font-size:56px;line-height:1.5;padding:14px 48px;border-radius:60px}}"
-            f".r1,.r2,.r3{{position:absolute;border-radius:50%;border:3px solid rgba(255,255,255,.14);left:50%;top:760px;transform:translate(-50%,-50%)}}"
-            f".r1{{width:420px;height:420px}}.r2{{width:720px;height:720px}}.r3{{width:1020px;height:1020px;border-color:rgba(251,191,36,.20)}}"
-            f".big{{position:absolute;left:0;right:0;top:640px;text-align:center;color:#fff;opacity:.16;font-family:{FONT};font-weight:800;font-size:170px;line-height:1.3;padding:0 60px}}"
-            f"</style></head><body><div class='s'></div>{deco}<div class='p'>{segs}</div>{t}</body></html>")
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
+            f"body{{background:#000}}.icon{{position:absolute;width:520px;height:520px;left:280px;top:475px;"
+            f"animation:float 2.8s ease-in-out infinite;filter:drop-shadow(0 0 18px rgba(255,255,255,.12))}}"
+            f"svg{{width:100%;height:100%;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}}"
+            f"@keyframes float{{0%,100%{{transform:translateY(0) scale(.96);opacity:.86}}50%{{transform:translateY(-18px) scale(1.04);opacity:1}}}}"
+            f"</style></head><body><div class='icon'><svg viewBox='0 0 100 100' aria-label='{icon}'>{art}</svg></div></body></html>")
 
+def highlight_html(text):
+    clean = strip_marks(text)
+    # Emphasize a meaningful keyword while preserving the full subtitle.
+    words = re.findall(r'[\u0600-\u06FF]+', clean)
+    candidates = [w for w in words if len(w) >= 4 and w not in {"برای", "اینکه", "باشد", "هستند", "میتوان", "میشه", "شما", "اونها", "چیزی"}]
+    if not candidates:
+        return html.escape(clean)
+    key = max(candidates, key=len)
+    escaped = html.escape(clean)
+    escaped_key = html.escape(key)
+    # Highlight first occurrence only; case-insensitive is unnecessary for Persian.
+    pos = escaped.find(escaped_key)
+    if pos < 0:
+        return escaped
+    return escaped[:pos] + "<span class='key'>" + escaped[pos:pos+len(escaped_key)] + "</span>" + escaped[pos+len(escaped_key):]
 
 def sub_html(text):
     text = strip_marks(text)
     n = len(text)
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
+    highlighted = highlight_html(text)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent}}"
-            f".w{{position:absolute;left:0;right:0;top:1150px;display:flex;justify-content:center}}"
-            f".b{{max-width:880px;background:rgba(10,14,30,.66);color:#fff;font-family:{FONT};"
-            f"font-weight:800;font-size:{size}px;line-height:1.75;padding:28px 50px;"
-            f"border-radius:40px;text-align:center;border-right:12px solid #fbbf24}}"
-            f"</style></head><body><div class='w'><div class='b'>{html.escape(text)}</div></div></body></html>")
-
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
+            f".w{{position:absolute;left:0;right:0;top:1280px;display:flex;justify-content:center}}"
+            f".b{{max-width:900px;background:rgba(0,0,0,.88);color:#fff;font-family:{FONT};"
+            f"font-weight:800;font-size:{size}px;line-height:1.65;padding:22px 36px;"
+            f"border-radius:22px;text-align:center;border-bottom:4px solid #fff}}"
+            f".key{{color:#facc15}}"
+            f"</style></head><body><div class='w'><div class='b'>{highlighted}</div></div></body></html>")
 
 # ---------------------------------------------------------------- mascot
 def sentence_mood(text):
@@ -548,75 +552,21 @@ def mascot_layer_html(mood):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
-    
-    hook, tag = strip_marks(hook), strip_marks(tag or COVER_TAG)
-    
-    if cover_image and cover_image.exists():
-        raw = cover_image.read_bytes()
-        mime = "image/png" if raw[:4] == b"\x89PNG" else "image/jpeg"
-        encoded = base64.b64encode(raw).decode("ascii")
-        cover_bg = (
-            "background-image:linear-gradient("
-            "rgba(0,0,0,.48),rgba(0,0,0,.78)),"
-            f"url('data:{mime};base64,{encoded}');"
-        )
-    else:
-        cover_bg = f"background:{MESH};"
-
-    n = len(hook)
-
-    size = 112 if n < 30 else 94 if n < 55 else 80
-
-    return (
-        f"<!doctype html><html lang='fa' dir='rtl'><head>"
-        f"<meta charset='utf-8'>{FONT_LINK}"
-        f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
-        f"body{{{cover_bg}font-family:{FONT};color:#fff;"
-        f"display:flex;flex-direction:column;align-items:center;"
-        f"justify-content:center;text-align:center;position:relative}}"
-        f".tag{{background:#facc15;color:#080808;font-weight:800;"
-        f"font-size:46px;padding:12px 46px;border-radius:60px;"
-        f"margin-bottom:50px}}"
-        f".card{{margin:0 70px;padding:80px 56px;border-radius:50px;"
-        f"background:rgba(255,255,255,.06);"
-        f"border:2px solid rgba(250,204,21,.55);"
-        f"box-shadow:0 20px 80px rgba(0,0,0,.35)}}"
-        f".h{{font-weight:800;font-size:{size}px;line-height:1.6}}"
-        f".bar{{width:220px;height:14px;background:#facc15;"
-        f"border-radius:8px;margin:44px auto 0}}"
-        f".f{{position:absolute;bottom:130px;left:0;right:0;"
-        f"font-size:44px;font-weight:500;color:#fff}}"
-        f"</style></head><body>"
-        f"<div class='tag'>{html.escape(tag)}</div>"
-        f"<div class='card'><div class='h'>{html.escape(hook)}</div>"
-        f"<div class='bar'></div></div>"
-        f"<div class='f'>{html.escape(COVER_FOOT)}</div>"
-        f"</body></html>"
-    )
+    word = cover_word(hook, tag)
+    n = len(word)
+    size = 150 if n < 6 else 124
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
+            f"body{{background:#000;display:flex;align-items:center;justify-content:center;text-align:center}}"
+            f".word{{font-family:{FONT};font-size:{size}px;font-weight:800;color:#facc15;line-height:1.5;"
+            f"animation:enter 1.1s cubic-bezier(.2,.8,.2,1) both}}"
+            f"@keyframes enter{{from{{opacity:0;transform:scale(.72)}}to{{opacity:1;transform:scale(1)}}}}"
+            f"</style></head><body><div class='word'>{html.escape(word)}</div></body></html>")
 
 def outro_html(mascot=False):
-    return (
-        f"<!doctype html><html lang='fa' dir='rtl'><head>"
-        f"<meta charset='utf-8'>{FONT_LINK}"
-        f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
-        f"body{{background:{MESH};font-family:{FONT};color:#fff;"
-        f"display:flex;align-items:center;justify-content:center;"
-        f"text-align:center}}"
-        f".card{{margin:80px;padding:70px 50px;"
-        f"border:2px solid #facc15;border-radius:48px;"
-        f"background:rgba(255,255,255,.05)}}"
-        f".title{{font-size:88px;font-weight:800;line-height:1.7}}"
-        f".bar{{width:180px;height:12px;background:#facc15;"
-        f"border-radius:8px;margin:35px auto 0}}"
-        f"</style></head><body>"
-        f"<div class='card'>"
-        f"<div class='title'>ادامه دارد...</div>"
-        f"<div class='bar'></div>"
-        f"</div></body></html>"
-    )
-
+    return (f"<!doctype html><html><head><meta charset='utf-8'>"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:#000}}</style>"
+            f"</head><body></body></html>")
 
 
 def render_pages(jobs):
@@ -704,18 +654,17 @@ def assemble(clips, durs, voice_wav, music, out):
 
 # ---------------------------------------------------------------- main
 def plan_shots(scenes):
-    """One shot = consecutive sentences that share one picture.
-    A new picture starts when a sentence contains a different keyword."""
+    """Split script into timed chunks and group adjacent sentences by semantic icon."""
     shots = []
     for i, sc in enumerate(scenes, start=1):
-        base = image_prompt(sc["title"], sc["text"])
         cur = None
         for ch in split_chunks(sc["text"]):
-            prompt = keyword_prompt("", ch) or (cur["prompt"] if cur else base)
-            if cur and prompt == cur["prompt"]:
+            icon = choose_icon((sc.get("title", "") + " " + ch))
+            if cur and cur["icon"] == icon:
                 cur["chunks"].append(ch)
             else:
-                cur = {"scene": i, "title": sc["title"], "prompt": prompt, "chunks": [ch]}
+                cur = {"scene": i, "title": sc.get("title", ""), "icon": icon,
+                       "prompt": icon, "chunks": [ch]}
                 shots.append(cur)
     while len(shots) > MAX_SHOTS:
         cands = [x for x in range(1, len(shots)) if shots[x]["scene"] == shots[x - 1]["scene"]]
@@ -729,68 +678,29 @@ def plan_shots(scenes):
 
 async def build(hook, scenes, d, dst, tag=None):
     shots = plan_shots(scenes)
-    # Mascot/lion graphics are intentionally disabled for this clean brand style.
-    found_poses = []
-    use_mascot = False
-    print("MASCOT: disabled")
 
-    # 1) audio: cover first, then every shot
+    # Keep the original Farid voice, original marked text for TTS, pauses and music.
     audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
     for k, sh in enumerate(shots, start=1):
-        end_of_scene = k == len(shots) or shots[k]["scene"] != sh["scene"]
+        # Keep natural pauses at the end of each original paragraph.
+        is_end = (k == len(shots) or shots[k]["scene"] != sh["scene"])
         audio.append(await build_scene_audio(k, sh["chunks"], d,
-                                             tail=TAIL if end_of_scene else GAP))
+                                             tail=TAIL if is_end else GAP))
 
     outro_wav = d / "outro.wav"
     silence_wav(outro_wav, OUTRO)
     audio.append((outro_wav, [], duration(outro_wav)))
     n = len(audio)
 
-    # Generate a dedicated AI image for the cover
-    cover_image = d / "cover_ai.jpg"
-    cover_prompt = (
-        image_prompt(hook, hook)
-        + ", cinematic editorial cover image, dramatic black background, "
-        "golden yellow highlights, strong visual subject, "
-        "high contrast, no text, no letters, no logos"
-    )
-    cover_ok = await asyncio.to_thread(
-        fetch_image, cover_prompt, cover_image, 2026
-    )
-    print("COVER AI IMAGE:", "generated" if cover_ok else "fallback")
-  
-    # 2) AI photos (two at a time)
-    sem = asyncio.Semaphore(2)
-
-    async def get(k, sh):
-        path = d / f"ai{k:02d}.jpg"
-        async with sem:
-            ok = await asyncio.to_thread(fetch_image, sh["prompt"], path, k * 7 + 3)
-        return path if ok else None
-
-    images = [None] + list(await asyncio.gather(
-        *[get(k, sh) for k, sh in enumerate(shots, start=1)]))
-    report = []
-    for k, sh in enumerate(shots, start=1):
-        print(f"shot {k} (scene {sh['scene']}): {sh['prompt']}")
-        report.append("AI image" if images[k] else "FALLBACK background")
-
-    # 3) render all pictures in one browser session
+    # All frames are generated locally: no external image service or photo assets.
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook, tag, use_mascot, cover_image if cover_ok else None), cover_png, False))
+    jobs.append((cover_html(hook, tag), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
-    mascot_rows = [[]]
-    mood_png = {}
-    for k in range(1, len(shots) + 1):
-        for m, _, _ in mood_runs(audio[k][1]):
-            if use_mascot and m not in mood_png:
-                mood_png[m] = d / f"mas_{m}.png"
-                jobs.append((mascot_layer_html(m), mood_png[m], True))
     for k, sh in enumerate(shots, start=1):
         bp = d / f"bg{k:02d}.png"
-        jobs.append((bg_html(images[k], sh["scene"], len(scenes), sh["title"]), bp, False))
+        jobs.append((bg_html(None, sh["scene"], len(scenes), sh["icon"]), bp, False))
         bg_pngs.append(bp)
         row = []
         for j, (txt, a, b) in enumerate(audio[k][1]):
@@ -798,21 +708,17 @@ async def build(hook, scenes, d, dst, tag=None):
             jobs.append((sub_html(txt), sp, True))
             row.append((sp, a, b))
         sub_pngs.append(row)
-        mascot_rows.append([(mood_png[m], a, b) for m, a, b in mood_runs(audio[k][1])] if use_mascot else [])
-    print("MASCOT: used=" + (",".join(sorted(mood_png)) if mood_png else "none"))
     outro_png = d / "outro.png"
-    jobs.append((outro_html(use_mascot), outro_png, False))
+    jobs.append((outro_html(), outro_png, False))
     bg_pngs.append(outro_png)
     sub_pngs.append([])
-    mascot_rows.append([])
     await asyncio.to_thread(render_pages, jobs)
 
-    # 4) one clip per shot, joined with crossfades
     clips, durs = [], []
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
         dur = audio[i][2]
-        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip, mascot_rows[i])
+        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip)
         clips.append(clip)
         durs.append(dur)
     voice = d / "voice.wav"
@@ -823,8 +729,8 @@ async def build(hook, scenes, d, dst, tag=None):
     assemble(clips, durs, voice, music, dst)
     (dst.parent / "cover.png").write_bytes(cover_png.read_bytes())
     total = sum(durs)
-    for k, r in enumerate(report, start=1):
-        print(f"shot {k}: {r}")
+    for k, sh in enumerate(shots, start=1):
+        print(f"shot {k}: icon={sh['icon']} scene={sh['scene']}")
     print(f"Done: {dst} ({n} clips incl. cover, {total:.1f} s)")
     if total > 90:
         print("NOTE: this reel is longer than 90 seconds; shorter reels usually keep viewers better.")
