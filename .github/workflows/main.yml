@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -24,7 +24,9 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: 3.12
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Check Telegram
         id: poll
@@ -40,13 +42,14 @@ jobs:
           git pull --rebase || true
           git push
 
-      - name: Install tools
+       - name: Install tools
         if: steps.poll.outputs.jobs != '0'
         run: |
-          sudo apt-get update && sudo apt-get install -y ffmpeg
-          pip install -r requirements.txt
-          playwright install --with-deps chromium
-
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
       - name: Build and send
         if: steps.poll.outputs.jobs != '0'
         run: python bot.py build
