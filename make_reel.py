@@ -6,7 +6,7 @@ Input file (input.txt):
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Scenes use a pure-black background and animated semantic vector icons.
+Backgrounds are pure black with topic-matched inline vector icons.
 
 Optional music: put royalty-free .mp3/.wav files in the repo (root or "music"
 folder); one is mixed quietly under the voice.
@@ -35,14 +35,16 @@ GAP = 0.28                       # pause between sentences (s)
 TAIL = 0.45                      # pause at the end of each scene (s)
 COVER_MIN = 2.6                  # minimum cover length (s)
 OUTRO = 2.4                      # end card length (s)
-PAGE_HANDLE = ""                 # e.g. "@your_page" - shown on the end card when set
+PAGE_HANDLE = ""  # no handle is displayed inside the video
 MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   # default.png + optional <mood>.png
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
 
 # ---- fixed cover template: only the hook text changes between reels
-COVER_TAG = "نکته‌ی امروز"          # default label; a reel can set its own ("# تیتر | برچسب")
-COVER_FOOT = "ذخیره کن  ·  برای تیمت بفرست"
+COVER_TAG = "آقای استمرار | Mr.Continuity"
+BRAND_NAME = "آقای استمرار | Mr.Continuity"
+BRAND_HANDLE = ""  # intentionally omitted from all video frames
+YELLOW = "#FFD21F"
 
 STYLE = (", realistic photo, natural light, shallow depth of field, high quality, "
          "vertical 9:16, no text, no letters, no logos")
@@ -298,101 +300,116 @@ def img_b64(path):
 
 
 
-MESH = "#000000"
+MESH = (
+    "radial-gradient(circle at 82% 18%,rgba(250,204,21,.18),transparent 32%),"
+    "radial-gradient(circle at 12% 82%,rgba(255,255,255,.06),transparent 38%),"
+    "#080808"
+)
 
-# Minimal white SVG line icons. No downloaded images or external icon libraries.
-ICON_ART = {
-    "brain": '<path d="M50 18c-10-12-26-4-24 8-12 2-15 18-5 24-8 10 0 24 11 23 2 13 17 15 22 5V24c0-3-1-5-4-6Z"/><path d="M50 18c10-12 26-4 24 8 12 2 15 18 5 24 8 10 0 24-11 23-2 13-17 15-22 5V24"/><path d="M31 31c8 0 10 7 8 12m-17 7c9-2 13 3 12 10m10-33c-2 7 1 12 6 13m19-9c-8 0-10 7-8 12m17 7c-9-2-13 3-12 10M50 40v30"/>',
-    "money": '<rect x="14" y="27" width="72" height="46" rx="5"/><circle cx="50" cy="50" r="14"/><path d="M23 35h8m41 30h8M50 40v20m-6-15c4-5 13-3 13 2s-14 3-14 8 10 8 14 2"/>',
-    "target": '<circle cx="50" cy="50" r="35"/><circle cx="50" cy="50" r="22"/><circle cx="50" cy="50" r="8"/><path d="m52 48 27-27m-12 0h12v12"/>',
-    "growth": '<path d="M16 80V20M16 80h70"/><path d="m25 67 18-19 14 9 25-31"/><path d="M67 26h15v15"/>',
-    "team": '<circle cx="50" cy="28" r="12"/><circle cx="25" cy="40" r="9"/><circle cx="75" cy="40" r="9"/><path d="M27 79V69c0-12 10-21 23-21s23 9 23 21v10M8 77v-8c0-9 7-16 17-16m67 24v-8c0-9-7-16-17-16"/>',
-    "book": '<path d="M12 23c16-7 29-4 38 5v53c-9-9-22-12-38-5zM88 23c-16-7-29-4-38 5v53c9-9 22-12 38-5z"/><path d="M22 35c8-2 15 0 20 4M22 47c8-2 15 0 20 4M78 35c-8-2-15 0-20 4M78 47c-8-2-15 0-20 4"/>',
-    "heart": '<path d="M50 79 18 49C-2 27 23 8 40 25l10 10 10-10c17-17 42 2 22 24z"/>',
-    "clock": '<circle cx="50" cy="50" r="36"/><path d="M50 28v24l17 10"/>',
-    "shield": '<path d="M50 12 80 24v22c0 20-13 33-30 42-17-9-30-22-30-42V24z"/><path d="m34 49 11 11 22-24"/>',
-    "chat": '<path d="M15 20h70v48H48L29 82V68H15z"/><path d="M30 36h40M30 48h28"/>',
-    "light": '<path d="M34 61c-4-6-10-12-10-23a26 26 0 0 1 52 0c0 11-6 17-10 23l-3 8H37zM39 79h22M42 88h16"/><path d="M50 3v8M10 38H2m96 0h-8M17 12l6 6m60-6-6 6"/>',
-    "generic": '<circle cx="50" cy="50" r="35"/><path d="M50 27v26m0 17h.1"/>'
-}
 
-ICON_RULES = [
-    ("brain", ("ذهن", "فکر", "تمرکز", "باور", "نگرش", "روان", "استرس", "ترس", "ذهنیت", "انگیزه", "مثبت")),
-    ("money", ("پول", "ثروت", "درآمد", "سرمایه", "مالی", "اقتصاد", "فروش", "سود", "بانک", "قیمت", "حقوق", "بیزینس", "کسبوکار", "ثروتمند")),
-    ("target", ("هدف", "برنامه", "موفقیت", "مسیر", "تصمیم", "تعهد", "اولویت", "آینده", "رسیدن")),
-    ("growth", ("رشد", "پیشرفت", "افزایش", "توسعه", "یادگیری", "مهارت", "نتیجه", "تغییر", "ساختن")),
-    ("team", ("تیم", "نتورک", "شبکه", "رهبری", "همکاری", "ارتباط", "مخاطب", "مشتری", "دعوت", "فروشنده")),
-    ("book", ("آموزش", "دانش", "کتاب", "یادبگیر", "درس", "تجربه", "علم", "تحلیل", "مطالعه")),
-    ("heart", ("عشق", "رابطه", "احساس", "خانواده", "دوست", "اعتماد", "احترام", "زندگی")),
-    ("clock", ("زمان", "وقت", "عادت", "روز", "صبر", "تأخیر", "تنبلی", "نظم")),
-    ("shield", ("امنیت", "ریسک", "خطر", "حفاظت", "اعتماد", "اشتباه", "اشتباهات")),
-    ("chat", ("صحبت", "گفتگو", "ارتباط", "کلام", "بیان", "مذاکره", "متقاعد")),
-    ("light", ("ایده", "خلاق", "فهم", "راز", "نکته", "هوش", "راهکار", "ترفند")),
-]
 
-def choose_icon(text):
-    t = norm(text)
-    for name, words in ICON_RULES:
-        if any(norm(w) in t for w in words):
-            return name
-    return "generic"
-
-def cover_word(hook, tag=None):
-    t = norm((hook or "") + " " + (tag or ""))
-    choices = [
-        ("موفقیت", ("موفق", "هدف", "پیشرفت")),
-        ("ثروت", ("ثروت", "پول", "درآمد", "سرمایه", "مالی")),
-        ("ذهنیت", ("ذهن", "فکر", "باور", "انگیزه", "مثبت")),
-        ("آموزش", ("آموزش", "یادگیری", "درس", "نکته")),
-        ("رشد", ("رشد", "توسعه", "مهارت")),
-        ("تیم‌سازی", ("تیم", "نتورک", "شبکه")),
-        ("روابط", ("رابطه", "اعتماد", "ارتباط", "خانواده")),
+def icon_kind(text):
+    t = norm(text).lower()
+    rules = [
+        (("ذهن", "فکر", "تمرکز", "هوش", "مغز"), "brain"),
+        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد"), "money"),
+        (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم"), "target"),
+        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه"), "growth"),
+        (("کتاب", "یادگیری", "آموزش", "دانش", "مطالعه"), "book"),
+        (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد"), "heart"),
+        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش"), "time"),
+        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش"), "question"),
+        (("بلاکچین", "بلاکچین", "کریپتو", "ارزدیجیتال", "تکنولوژی", "فناوری"), "network"),
+        (("تیم", "رهبری", "همکاری", "نتورک", "ارتباط"), "people"),
     ]
-    for word, keys in choices:
+    for words, kind in rules:
+        if any(norm(w) in t for w in words):
+            return kind
+    return "spark"
+
+
+def icon_svg(text, color="#FFFFFF", size=300):
+    """Inline, dependency-free vector icons selected from the scene topic."""
+    kind = icon_kind(text)
+    paths = {
+        "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
+        "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
+        "target": "<circle cx='60' cy='60' r='42'/><circle cx='60' cy='60' r='27'/><circle cx='60' cy='60' r='11'/><path d='M60 60 99 21M83 21h16v16'/>",
+        "growth": "<path d='M18 100V20M18 100h86'/><path d='m28 82 23-24 17 12 31-39'/><path d='M81 31h18v18'/>",
+        "book": "<path d='M15 25c20-7 34-2 45 8v61C49 83 34 79 15 86Z'/><path d='M105 25c-20-7-34-2-45 8v61c11-11 26-15 45-8Z'/><path d='M29 42c8-2 15 0 22 4M29 55c8-2 15 0 22 4M91 42c-8-2-15 0-22 4M91 55c-8-2-15 0-22 4'/>",
+        "heart": "<path d='M60 99 20 61C-3 36 28 9 49 29l11 11 11-11c21-20 52 7 29 32Z'/>",
+        "time": "<circle cx='60' cy='60' r='42'/><path d='M60 34v28l20 13'/>",
+        "question": "<path d='M38 42c2-27 42-31 48-6 4 18-22 21-25 39'/><circle cx='60' cy='91' r='3'/>",
+        "network": "<circle cx='60' cy='22' r='10'/><circle cx='25' cy='86' r='10'/><circle cx='95' cy='86' r='10'/><circle cx='60' cy='62' r='12'/><path d='M55 32 42 52M65 32 78 52M50 70 32 79M70 70 88 79'/>",
+        "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12M9 91V78c0-10 8-18 18-18M111 91V78c0-10-8-18-18-18'/>",
+        "spark": "<path d='m60 8 12 37 37 15-37 12-12 37-12-37L11 60l37-15Z'/><path d='m97 9 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z'/>",
+    }
+    return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
+            f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
+            f"stroke-linejoin='round' aria-label='{kind}' "
+            f"style='filter:drop-shadow(0 5px 2px rgba(255,255,255,.16)) drop-shadow(0 0 12px rgba(255,255,255,.12))'>"
+            f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
+
+
+def cover_word(hook):
+    """Choose a single concise Persian cover word based on topic."""
+    t = norm(hook)
+    words = [
+        (("ذهن", "فکر", "تمرکز"), "ذهن"), (("پول", "درآمد", "ثروت", "سرمایه"), "ثروت"),
+        (("هدف", "برنامه"), "هدف"), (("موفق", "پیروزی"), "موفقیت"),
+        (("آموزش", "یادگیری", "دانش"), "آموزش"), (("استمرار", "پشتکار", "عادت"), "استمرار"),
+        (("رشد", "پیشرفت"), "رشد"), (("بلاکچین", "کریپتو", "ارزدیجیتال"), "بلاکچین"),
+        (("ترس", "نگرانی"), "ترس"), (("زمان", "وقت"), "زمان"),
+    ]
+    for keys, word in words:
         if any(norm(k) in t for k in keys):
             return word
-    return "انگیزه"
+    tokens = re.findall(r"[\u0600-\u06FF\w]+", strip_marks(hook))
+    ignored = {"از", "برای", "چطور", "چگونه", "چرا", "اگر", "این", "آن", "یک", "که", "با", "به"}
+    return next((x for x in tokens if len(x) > 2 and x not in ignored), "استمرار")
+
 
 def bg_html(image_path, idx, total, title):
-    icon = title if title in ICON_ART else choose_icon(title or "")
-    art = ICON_ART.get(icon, ICON_ART["generic"])
+    """Pure-black scene with a large dimensional vector icon; no extra scene-title text."""
+    icon = icon_svg(title or "", "#FFFFFF", 390)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
-            f"body{{background:#000}}.icon{{position:absolute;width:520px;height:520px;left:280px;top:475px;"
-            f"animation:float 2.8s ease-in-out infinite;filter:drop-shadow(0 0 18px rgba(255,255,255,.12))}}"
-            f"svg{{width:100%;height:100%;fill:none;stroke:#fff;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round}}"
-            f"@keyframes float{{0%,100%{{transform:translateY(0) scale(.96);opacity:.86}}50%{{transform:translateY(-18px) scale(1.04);opacity:1}}}}"
-            f"</style></head><body><div class='icon'><svg viewBox='0 0 100 100' aria-label='{icon}'>{art}</svg></div></body></html>")
+            f"body{{font-family:{FONT};color:#fff}}"
+            f".icon{{position:absolute;left:0;right:0;top:510px;display:flex;justify-content:center;"
+            f"align-items:center;opacity:.99;transform:perspective(900px) rotateX(-4deg);"
+            f"filter:drop-shadow(0 18px 24px rgba(255,255,255,.08));}}"
+            f"</style></head><body><div class='icon'>{icon}</div></body></html>")
 
-def highlight_html(text):
-    clean = strip_marks(text)
-    # Emphasize a meaningful keyword while preserving the full subtitle.
-    words = re.findall(r'[\u0600-\u06FF]+', clean)
-    candidates = [w for w in words if len(w) >= 4 and w not in {"برای", "اینکه", "باشد", "هستند", "میتوان", "میشه", "شما", "اونها", "چیزی"}]
-    if not candidates:
-        return html.escape(clean)
-    key = max(candidates, key=len)
-    escaped = html.escape(clean)
-    escaped_key = html.escape(key)
-    # Highlight first occurrence only; case-insensitive is unnecessary for Persian.
-    pos = escaped.find(escaped_key)
-    if pos < 0:
-        return escaped
-    return escaped[:pos] + "<span class='key'>" + escaped[pos:pos+len(escaped_key)] + "</span>" + escaped[pos+len(escaped_key):]
 
 def sub_html(text):
+    """Subtitle only: no social handle; brand name remains yellow at the bottom."""
     text = strip_marks(text)
     n = len(text)
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
-    highlighted = highlight_html(text)
+    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "بلاکچین", "درآمد", "تلاش"]
+    highlighted = None
+    normalized = norm(text)
+    for word in keyword_groups:
+        if norm(word) in normalized:
+            highlighted = word
+            break
+    safe = html.escape(text)
+    if highlighted:
+        pat = re.compile(re.escape(highlighted), re.IGNORECASE)
+        safe = pat.sub(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-            f".w{{position:absolute;left:0;right:0;top:1280px;display:flex;justify-content:center}}"
-            f".b{{max-width:900px;background:rgba(0,0,0,.88);color:#fff;font-family:{FONT};"
-            f"font-weight:800;font-size:{size}px;line-height:1.65;padding:22px 36px;"
-            f"border-radius:22px;text-align:center;border-bottom:4px solid #fff}}"
-            f".key{{color:#facc15}}"
-            f"</style></head><body><div class='w'><div class='b'>{highlighted}</div></div></body></html>")
+            f".w{{position:absolute;left:60px;right:60px;top:1080px;display:flex;justify-content:center}}"
+            f".b{{max-width:920px;background:rgba(0,0,0,.88);color:#fff;font-family:{FONT};"
+            f"font-weight:800;font-size:{size}px;line-height:1.65;padding:24px 36px;"
+            f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.14)}}"
+            f".kw{{color:{YELLOW}}}"
+            f".brand{{position:absolute;left:0;right:0;top:1500px;text-align:center;color:{YELLOW};"
+            f"font-family:{FONT};font-size:38px;font-weight:800;line-height:1.55;"
+            f"text-shadow:0 0 20px rgba(255,210,31,.22)}}"
+            f"</style></head><body><div class='w'><div class='b'>{safe}</div></div>"
+            f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>")
+
 
 # ---------------------------------------------------------------- mascot
 def sentence_mood(text):
@@ -552,21 +569,39 @@ def mascot_layer_html(mood):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
-    word = cover_word(hook, tag)
-    n = len(word)
-    size = 150 if n < 6 else 124
+    """Minimal black cover: one yellow topic word, matching yellow vector icon, white brand."""
+    word = cover_word(hook)
+    icon = icon_svg(word, YELLOW, 330)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
-            f"body{{background:#000;display:flex;align-items:center;justify-content:center;text-align:center}}"
-            f".word{{font-family:{FONT};font-size:{size}px;font-weight:800;color:#facc15;line-height:1.5;"
-            f"animation:enter 1.1s cubic-bezier(.2,.8,.2,1) both}}"
-            f"@keyframes enter{{from{{opacity:0;transform:scale(.72)}}to{{opacity:1;transform:scale(1)}}}}"
-            f"</style></head><body><div class='word'>{html.escape(word)}</div></body></html>")
+            f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
+            f"align-items:center;justify-content:center;text-align:center;position:relative}}"
+            f".icon{{margin-bottom:36px;display:flex;align-items:center;justify-content:center}}"
+            f".word{{color:{YELLOW};font-weight:800;font-size:126px;line-height:1.35;max-width:900px;"
+            f"overflow-wrap:anywhere}}"
+            f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:39px;font-weight:800;color:#fff}}"
+            f".handle{{display:block;direction:ltr;font-size:31px;margin-top:12px;font-weight:600}}"
+            f"</style></head><body><div class='icon'>{icon}</div>"
+            f"<div class='word'>{html.escape(word)}</div>"
+            f"<div class='brand'>{html.escape(BRAND_NAME)}<span class='handle'>{html.escape(BRAND_HANDLE)}</span></div>"
+            f"</body></html>")
+
 
 def outro_html(mascot=False):
-    return (f"<!doctype html><html><head><meta charset='utf-8'>"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:#000}}</style>"
-            f"</head><body></body></html>")
+    """Silent end card: exact yellow slogan centered, brand beneath it, no handle."""
+    slogan = "با آقای استمرار، انگیزه بساز"
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
+            f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
+            f"text-align:center}}.wrap{{width:940px;display:flex;flex-direction:column;align-items:center;"
+            f"justify-content:center;gap:42px}}"
+            f".slogan{{font-size:94px;font-weight:800;line-height:1.65;color:{YELLOW};"
+            f"text-shadow:0 0 26px rgba(255,210,31,.18)}}"
+            f".brand{{font-size:48px;font-weight:800;color:{YELLOW};line-height:1.5}}"
+            f"</style></head><body><div class='wrap'>"
+            f"<div class='slogan'>{html.escape(slogan)}</div>"
+            f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
+            f"</div></body></html>")
 
 
 def render_pages(jobs):
@@ -654,17 +689,18 @@ def assemble(clips, durs, voice_wav, music, out):
 
 # ---------------------------------------------------------------- main
 def plan_shots(scenes):
-    """Split script into timed chunks and group adjacent sentences by semantic icon."""
+    """One shot = consecutive sentences that share one picture.
+    A new picture starts when a sentence contains a different keyword."""
     shots = []
     for i, sc in enumerate(scenes, start=1):
+        base = image_prompt(sc["title"], sc["text"])
         cur = None
         for ch in split_chunks(sc["text"]):
-            icon = choose_icon((sc.get("title", "") + " " + ch))
-            if cur and cur["icon"] == icon:
+            prompt = keyword_prompt("", ch) or (cur["prompt"] if cur else base)
+            if cur and prompt == cur["prompt"]:
                 cur["chunks"].append(ch)
             else:
-                cur = {"scene": i, "title": sc.get("title", ""), "icon": icon,
-                       "prompt": icon, "chunks": [ch]}
+                cur = {"scene": i, "title": sc["title"], "prompt": prompt, "chunks": [ch]}
                 shots.append(cur)
     while len(shots) > MAX_SHOTS:
         cands = [x for x in range(1, len(shots)) if shots[x]["scene"] == shots[x - 1]["scene"]]
@@ -677,30 +713,34 @@ def plan_shots(scenes):
 
 
 async def build(hook, scenes, d, dst, tag=None):
-    shots = plan_shots(scenes)
+    """Build a black-background, vector-icon reel while preserving Farid voice/music."""
+    # Use one shot per original scene; each scene is represented by a topic-matched vector icon.
+    shots = []
+    for i, sc in enumerate(scenes, start=1):
+        chunks = split_chunks(sc["text"])
+        if chunks:
+            shots.append({"scene": i, "title": sc.get("title", ""), "chunks": chunks})
+    if not shots:
+        raise ValueError("Input file has no readable scenes.")
 
-    # Keep the original Farid voice, original marked text for TTS, pauses and music.
+    # Audio flow intentionally remains cover -> scenes -> silent branded outro.
     audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
     for k, sh in enumerate(shots, start=1):
-        # Keep natural pauses at the end of each original paragraph.
-        is_end = (k == len(shots) or shots[k]["scene"] != sh["scene"])
         audio.append(await build_scene_audio(k, sh["chunks"], d,
-                                             tail=TAIL if is_end else GAP))
-
+                                             tail=TAIL if k == len(shots) else GAP))
     outro_wav = d / "outro.wav"
     silence_wav(outro_wav, OUTRO)
     audio.append((outro_wav, [], duration(outro_wav)))
     n = len(audio)
 
-    # All frames are generated locally: no external image service or photo assets.
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook, tag), cover_png, False))
+    jobs.append((cover_html(hook), cover_png, False))
     bg_pngs.append(cover_png)
     sub_pngs.append([])
     for k, sh in enumerate(shots, start=1):
         bp = d / f"bg{k:02d}.png"
-        jobs.append((bg_html(None, sh["scene"], len(scenes), sh["icon"]), bp, False))
+        jobs.append((bg_html(None, sh["scene"], len(scenes), sh["title"] or " ".join(sh["chunks"])), bp, False))
         bg_pngs.append(bp)
         row = []
         for j, (txt, a, b) in enumerate(audio[k][1]):
@@ -718,7 +758,7 @@ async def build(hook, scenes, d, dst, tag=None):
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
         dur = audio[i][2]
-        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip)
+        scene_video(i, bg_pngs[i], sub_pngs[i], dur, i == n - 1, clip, ())
         clips.append(clip)
         durs.append(dur)
     voice = d / "voice.wav"
@@ -729,8 +769,6 @@ async def build(hook, scenes, d, dst, tag=None):
     assemble(clips, durs, voice, music, dst)
     (dst.parent / "cover.png").write_bytes(cover_png.read_bytes())
     total = sum(durs)
-    for k, sh in enumerate(shots, start=1):
-        print(f"shot {k}: icon={sh['icon']} scene={sh['scene']}")
     print(f"Done: {dst} ({n} clips incl. cover, {total:.1f} s)")
     if total > 90:
         print("NOTE: this reel is longer than 90 seconds; shorter reels usually keep viewers better.")
