@@ -57,6 +57,16 @@ FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
 
 # keyword (Persian, without half-spaces) -> visual prompt. First match wins.
 KEYWORDS = [
+    (("بلاکچین", "بلاک چین", "قرارداد هوشمند", "غیرمتمرکز", "شبکه بلاکچین"),
+     "cinematic realistic photo of a smartphone displaying abstract blockchain network nodes, connected glowing blocks, black background with restrained golden yellow highlights, no readable text"),
+    (("تبلیغات", "تبلیغ", "بازاریابی", "مشتری", "فروش"),
+     "realistic photo of a small marketing team reviewing a digital campaign on a laptop, modern workspace, black and golden yellow accents, no readable text"),
+    (("درآمد", "پول", "سرمایه", "مالی", "سود"),
+     "realistic close-up photo of a person reviewing finances and charts on a laptop at a desk, subtle golden light, no readable text"),
+    (("هوش مصنوعی", "هوشمصنوعی", "هوش", "الگوریتم"),
+     "realistic photo of a professional using an AI analytics interface on a laptop, abstract data visualization, dark workspace with golden highlights, no readable text"),
+    (("امنیت", "امن", "کیف پول", "ولت", "رمزارز", "ارز دیجیتال", "بیتکوین", "بیت کوین"),
+     "realistic close-up of a smartphone and laptop showing abstract secure digital finance interface, shield motif, dark background with golden highlights, no readable text"),
     (("ثبتنام", "عضویت", "فرم"),
      "candid photo of two people at a desk filling out a registration form together, friendly consultant, bright modern office"),
     (("تیمسازی", "تیم", "همتیم"),
@@ -203,7 +213,40 @@ def llm_prompt(text):
 
 
 def image_prompt(title, text):
-    return keyword_prompt(title, text) or llm_prompt(text) or FALLBACK_PROMPT
+    # Prefer a concrete, topic-matched visual over the same generic office image.
+    prompt = keyword_prompt(title, text)
+    if prompt:
+        return prompt
+    prompt = llm_prompt(text)
+    if prompt:
+        return prompt
+    # Offline/service-failure fallback: choose a relevant visual from the text
+    # rather than repeating the same generic image in every scene.
+    n = norm((title or "") + " " + (text or ""))
+    fallbacks = [
+        (("تلفن", "پیام", "آنلاین", "اینترنت", "فضای مجازی"),
+         "realistic photo of a person using a smartphone in a modern workspace, dark background, golden yellow accent lighting"),
+        (("هدف", "برنامه", "برنامهریزی", "زمان", "روزانه"),
+         "realistic close-up photo of a planner, pen and hands organizing a weekly plan on a desk, warm golden light"),
+        (("تیم", "همکاری", "گروه", "نتورک"),
+         "realistic photo of a small diverse team collaborating around a table, candid expressions, modern office"),
+        (("یادگیری", "آموزش", "مهارت", "دانش"),
+         "realistic photo of a person learning from a laptop with a notebook open, focused expression, modern desk"),
+        (("تصمیم", "انتخاب", "مسیر", "شروع"),
+         "realistic photo of a thoughtful professional standing by a window in a modern office, cinematic natural light"),
+    ]
+    for keys, visual in fallbacks:
+        if any(k in n for k in keys):
+            return visual
+    # Stable but varied fallbacks for otherwise unmatched text.
+    options = [
+        "realistic photo of a professional discussing an idea with a colleague in a modern workspace, natural light",
+        "realistic photo of hands arranging notes and a smartphone on a desk, cinematic close-up",
+        "realistic photo of a focused person looking at a laptop in a quiet modern workspace, soft natural light",
+        "realistic photo of two colleagues brainstorming beside a whiteboard, candid documentary photography",
+    ]
+    index = int(hashlib.md5(n.encode("utf-8")).hexdigest(), 16) % len(options)
+    return options[index]
 
 
 def fetch_image(prompt, path, seed):
@@ -686,9 +729,10 @@ def plan_shots(scenes):
 
 async def build(hook, scenes, d, dst, tag=None):
     shots = plan_shots(scenes)
-    found_poses = scan_mascots()
-    use_mascot = bool(found_poses)
-    print('MASCOT: found=' + (','.join(found_poses) if found_poses else 'none'))
+    # Mascot/lion graphics are intentionally disabled for this clean brand style.
+    found_poses = []
+    use_mascot = False
+    print("MASCOT: disabled")
 
     # 1) audio: cover first, then every shot
     audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
