@@ -23,35 +23,47 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
 
-      - name: Check Telegram
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Check Telegram for new messages
         id: poll
         run: python bot.py poll
 
-      - name: Save state
+      - name: Install video tools and Chromium
+        if: steps.poll.outputs.jobs != '0'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m playwright install --with-deps chromium
+
+      - name: Build and send video
+        if: steps.poll.outputs.jobs != '0'
+        run: python bot.py build
+
+      - name: Save Telegram polling state
         if: steps.poll.outputs.changed == 'true'
         run: |
           git config user.name "reel-bot"
           git config user.email "reel-bot@users.noreply.github.com"
           git add state/offset.txt
-          git commit -m "update state" || true
-          git pull --rebase || true
+          if git diff --cached --quiet; then
+            echo "No state changes to commit."
+            exit 0
+          fi
+          git commit -m "Update Telegram polling state"
           git push
-
-      - name: Install tools
-        if: steps.poll.outputs.jobs != '0'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m playwright install chromium
-
-      - name: Build and send
-        if: steps.poll.outputs.jobs != '0'
-        run: python bot.py build
