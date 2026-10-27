@@ -1,8 +1,9 @@
+
 name: reel-bot
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -16,9 +17,11 @@ jobs:
   run:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +51,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m playwright install chromium
+
       - name: Build and send
         if: steps.poll.outputs.jobs != '0'
         run: python bot.py build
