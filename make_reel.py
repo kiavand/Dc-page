@@ -552,6 +552,28 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"</body></html>"
     )
 
+def outro_html(mascot=False):
+    return (
+        f"<!doctype html><html lang='fa' dir='rtl'><head>"
+        f"<meta charset='utf-8'>{FONT_LINK}"
+        f"<style>"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden}}"
+        f"body{{background:{MESH};font-family:{FONT};color:#fff;"
+        f"display:flex;align-items:center;justify-content:center;"
+        f"text-align:center}}"
+        f".card{{margin:80px;padding:70px 50px;"
+        f"border:2px solid #facc15;border-radius:48px;"
+        f"background:rgba(255,255,255,.05)}}"
+        f".title{{font-size:88px;font-weight:800;line-height:1.7}}"
+        f".bar{{width:180px;height:12px;background:#facc15;"
+        f"border-radius:8px;margin:35px auto 0}}"
+        f"</style></head><body>"
+        f"<div class='card'>"
+        f"<div class='title'>ادامه دارد...</div>"
+        f"<div class='bar'></div>"
+        f"</div></body></html>"
+    )
+
 
 
 def render_pages(jobs):
