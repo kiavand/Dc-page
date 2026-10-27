@@ -42,7 +42,7 @@ jobs:
           git pull --rebase || true
           git push
 
-       - name: Install tools
+      - name: Install tools
         if: steps.poll.outputs.jobs != '0'
         run: |
           sudo apt-get update
