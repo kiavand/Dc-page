@@ -171,7 +171,47 @@ def split_chunks(text, max_chars=72):
             final.append(p[:cut].strip())
             p = p[cut:].strip()
         final.append(p)
-    return final
+    # Edge TTS may return NoAudioReceived for an isolated one-character chunk.
+    # Merge such chunks into adjacent speech instead of dropping or synthesizing
+    # them alone. This preserves the original words and avoids extra audio.
+    merged = []
+    for part in final:
+        part = part.strip()
+        if not part:
+            continue
+
+        # A chunk with no letters/numbers is punctuation-only. Attach it to the
+        # preceding chunk so punctuation stays with the phrase it marks.
+        meaningful = re.sub(r"[^\w]", "", part, flags=re.UNICODE)
+        if not meaningful:
+            if merged:
+                merged[-1] += part
+            elif final:
+                # Leading punctuation: hold it until the next real chunk.
+                merged.append(part)
+            continue
+
+        # One-character chunks (including valid short words such as «و») are
+        # retained and joined to the next chunk, never discarded.
+        if len(meaningful) <= 1 and merged:
+            merged[-1] = (merged[-1] + " " + part).strip()
+        else:
+            merged.append(part)
+
+    # If the last chunk is only one meaningful character, join it to the
+    # previous chunk. This is a text-only merge; it does not add new content.
+    if len(merged) > 1:
+        last_meaningful = re.sub(r"[^\w]", "", merged[-1], flags=re.UNICODE)
+        if len(last_meaningful) <= 1:
+            merged[-2] = (merged[-2] + " " + merged[-1]).strip()
+            merged.pop()
+
+    # A leading punctuation-only chunk can now be safely attached to the next.
+    while len(merged) > 1 and not re.sub(r"[^\w]", "", merged[0], flags=re.UNICODE):
+        merged[1] = (merged[0] + merged[1]).strip()
+        merged.pop(0)
+
+    return merged
 
 
 # ---------------------------------------------------------------- AI images
@@ -420,8 +460,21 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
 
 
 def cover_word(hook):
-    """Choose a meaningful Persian cover title: one word when clear, otherwise two."""
+    """Turn the hook into a short, meaningful 1–2 word cover phrase, not a clipped fragment."""
     t = norm(hook).strip()
+    # Convert common hook-style phrases into a punchy cover idea.
+    hook_phrases = [
+        (("منتظر نمون", "منتظر نمان", "منتظر شرایط", "شروع نکردن", "شروع کن"), "شروع کن"),
+        (("کمال گرایی", "کمالگرایی", "بی نقص", "بی‌نقص"), "شروع ناقص"),
+        (("کنترل ذهن", "ذهن در شرایط سخت", "ذهنمون رو کنترل"), "کنترل ذهن"),
+        (("مثبت نگه داشتن", "مثبت بمون", "مثبت باش"), "ذهن مثبت"),
+        (("اعتماد به نفس", "اعتمادبنفس"), "اعتمادبه‌نفس"),
+        (("مدیریت پول", "پول بیشتر", "درآمد بیشتر"), "رشد مالی"),
+        (("عادت های درست", "عادت‌های درست", "ساختن عادت"), "عادت‌سازی"),
+    ]
+    for phrases, label in hook_phrases:
+        if any(norm(phrase) in t for phrase in phrases):
+            return label
     # Topics that can be expressed accurately in one strong word.
     single_word_rules = [
         (("ذهن", "فکر", "تمرکز", "هوش ذهنی"), "ذهن"),
@@ -497,10 +550,10 @@ def sub_html(text, icon_override=None):
             highlighted = None
 
     # Icon is rendered in the subtitle layer, so it changes with every spoken text chunk.
-    icon = icon_svg(text, YELLOW, 168, icon_override)
+    icon = icon_svg(text, YELLOW, 250, icon_override)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-            f".sub-icon{{position:absolute;left:0;right:0;top:820px;display:flex;justify-content:center;"
+            f".sub-icon{{position:absolute;left:0;right:0;top:745px;display:flex;justify-content:center;"
             f"align-items:center;filter:drop-shadow(0 0 18px rgba(255,210,31,.24));}}"
             f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
             f".b{{max-width:920px;background:rgba(0,0,0,.9);color:#fff;font-family:{FONT};"
