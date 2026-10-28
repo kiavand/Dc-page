@@ -311,21 +311,26 @@ MESH = (
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
-        (("ذهن", "فکر", "تمرکز", "هوش", "مغز"), "brain"),
-        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد"), "money"),
-        (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم"), "target"),
-        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه"), "growth"),
-        (("کتاب", "یادگیری", "آموزش", "دانش", "مطالعه"), "book"),
-        (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد"), "heart"),
-        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش"), "time"),
-        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش"), "question"),
-        (("بلاکچین", "بلاکچین", "کریپتو", "ارزدیجیتال", "تکنولوژی", "فناوری"), "network"),
-        (("تیم", "رهبری", "همکاری", "نتورک", "ارتباط"), "people"),
+        (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری"), "brain"),
+        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد", "فروش", "قیمت", "بازار", "معامله", "سود", "ضرر", "ریسک"), "money"),
+        (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم", "شروع", "نتیجه", "اولویت"), "target"),
+        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود", "ساختن"), "growth"),
+        (("کتاب", "یادگیری", "آموزش", "دانش", "مطالعه", "مهارت", "درس", "تجربه"), "book"),
+        (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد", "احترام", "گفتگو", "گفتوگو", "زبانبدن", "مذاکره", "قرارداد", "ارتباط"), "heart"),
+        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "انضباط", "تعهد", "روزانه", "تکرار"), "time"),
+        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش", "مشکل", "اشتباه", "راهحل", "چالش"), "question"),
+        (("بلاکچین", "کریپتو", "ارزدیجیتال", "تکنولوژی", "فناوری", "شبکه", "اینترنت", "هوشمصنوعی", "ربات", "سیستم"), "network"),
+        (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت", "مربی", "جلسه", "تیمسازی"), "people"),
+        (("ترس", "نگرانی", "اضطراب", "فشار", "استرس", "شکست", "اعتمادبهنفس", "انگیزه", "امید"), "heart"),
+        (("سلامت", "ورزش", "بدن", "انرژی", "خواب", "تغذیه", "قدرت"), "growth"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
             return kind
-    return "spark"
+    # Unknown topics should not all collapse to the same star/spark icon.
+    # Pick a stable, varied fallback from the available semantic shapes.
+    choices = ("target", "brain", "network", "book", "people", "growth", "question", "time", "heart", "money")
+    return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
 def icon_svg(text, color="#FFFFFF", size=300):
@@ -595,9 +600,12 @@ def outro_html(mascot=False):
             f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
             f"text-align:center}}.wrap{{width:940px;display:flex;flex-direction:column;align-items:center;"
             f"justify-content:center;gap:42px}}"
-            f".slogan{{font-size:94px;font-weight:800;line-height:1.65;color:{YELLOW};"
-            f"text-shadow:0 0 26px rgba(255,210,31,.18)}}"
-            f".brand{{font-size:48px;font-weight:800;color:{YELLOW};line-height:1.5}}"
+            f".slogan{{font-size:58px;font-weight:800;line-height:1.35;color:{YELLOW};"
+            f"white-space:nowrap;text-shadow:0 0 26px rgba(255,210,31,.18)}}"
+            f".brand{{font-size:40px;font-weight:800;color:{YELLOW};line-height:1.4}}"
+            f".wrap{{width:100%;padding:0 36px;box-sizing:border-box}}"
+            f"@media (max-width:1080px){{.slogan{{font-size:clamp(42px,5.2vw,58px)}}"
+            f".brand{{font-size:clamp(30px,3.7vw,40px)}}}}"
             f"</style></head><body><div class='wrap'>"
             f"<div class='slogan'>{html.escape(slogan)}</div>"
             f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
