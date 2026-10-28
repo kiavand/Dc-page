@@ -387,32 +387,46 @@ def bg_html(image_path, idx, total, title):
 
 
 def sub_html(text):
-    """Subtitle only: no social handle; brand name remains yellow at the bottom."""
+    """Each subtitle gets its own topic-matched yellow icon and a guaranteed yellow keyword."""
     text = strip_marks(text)
     n = len(text)
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
-    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "بلاکچین", "درآمد", "تلاش"]
-    highlighted = None
+
+    # Prefer known meaningful terms; if none occur, highlight the strongest content word.
+    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "بلاکچین", "درآمد", "تلاش",
+                      "نتورک", "تیم", "رهبر", "رهبری", "اعتماد", "ترس", "شکست", "عادت", "تمرکز", "تصمیم",
+                      "انگیزه", "یادگیری", "دانش", "زمان", "فرصت", "تغییر", "زندگی", "قدرت", "مسئولیت"]
     normalized = norm(text)
-    for word in keyword_groups:
-        if norm(word) in normalized:
-            highlighted = word
-            break
+    highlighted = next((w for w in keyword_groups if norm(w) in normalized), None)
+    if not highlighted:
+        stop = {"این", "آن", "برای", "چون", "اما", "اگر", "باید", "باشد", "هست", "است", "شود", "شده", "کرد", "کنید", "کنیم", "همین", "خیلی", "بیشتر", "کمتر", "وقتی", "چطور", "چگونه", "چرا", "یک", "از", "به", "در", "با", "که", "را", "و", "یا", "تا", "نه", "می", "تواند"}
+        words = re.findall(r"[\u0600-\u06FF]{3,}", text)
+        candidates = [w for w in words if norm(w) not in stop]
+        if candidates:
+            highlighted = max(candidates, key=lambda w: len(norm(w)))
+
     safe = html.escape(text)
     if highlighted:
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
-        safe = pat.sub(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe)
+        safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
+        if not count:
+            highlighted = None
+
+    # Icon is rendered in the subtitle layer, so it changes with every spoken text chunk.
+    icon = icon_svg(text, YELLOW, 132)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-            f".w{{position:absolute;left:60px;right:60px;top:1080px;display:flex;justify-content:center}}"
-            f".b{{max-width:920px;background:rgba(0,0,0,.88);color:#fff;font-family:{FONT};"
+            f".sub-icon{{position:absolute;left:0;right:0;top:820px;display:flex;justify-content:center;"
+            f"align-items:center;filter:drop-shadow(0 0 18px rgba(255,210,31,.24));}}"
+            f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
+            f".b{{max-width:920px;background:rgba(0,0,0,.9);color:#fff;font-family:{FONT};"
             f"font-weight:800;font-size:{size}px;line-height:1.65;padding:24px 36px;"
             f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.14)}}"
-            f".kw{{color:{YELLOW}}}"
+            f".kw{{color:{YELLOW};text-shadow:0 0 12px rgba(255,210,31,.2)}}"
             f".brand{{position:absolute;left:0;right:0;top:1500px;text-align:center;color:{YELLOW};"
             f"font-family:{FONT};font-size:38px;font-weight:800;line-height:1.55;"
             f"text-shadow:0 0 20px rgba(255,210,31,.22)}}"
-            f"</style></head><body><div class='w'><div class='b'>{safe}</div></div>"
+            f"</style></head><body><div class='sub-icon'>{icon}</div><div class='w'><div class='b'>{safe}</div></div>"
             f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>")
 
 
@@ -600,12 +614,12 @@ def outro_html(mascot=False):
             f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
             f"text-align:center}}.wrap{{width:940px;display:flex;flex-direction:column;align-items:center;"
             f"justify-content:center;gap:42px}}"
-            f".slogan{{font-size:58px;font-weight:800;line-height:1.35;color:{YELLOW};"
-            f"white-space:nowrap;text-shadow:0 0 26px rgba(255,210,31,.18)}}"
-            f".brand{{font-size:40px;font-weight:800;color:{YELLOW};line-height:1.4}}"
-            f".wrap{{width:100%;padding:0 36px;box-sizing:border-box}}"
-            f"@media (max-width:1080px){{.slogan{{font-size:clamp(42px,5.2vw,58px)}}"
-            f".brand{{font-size:clamp(30px,3.7vw,40px)}}}}"
+            f".slogan{{font-size:94px;font-weight:800;line-height:1.65;color:{YELLOW};"
+            f"text-shadow:0 0 26px rgba(255,210,31,.18)}}"
+            f".brand{{font-size:48px;font-weight:800;color:{YELLOW};line-height:1.5}}"
+            f".slogan{{max-width:100%;overflow-wrap:normal;word-break:normal}}"
+            f"@media (max-width:1080px){{.slogan{{font-size:clamp(64px,7.5vw,86px);line-height:1.55}}"
+            f".brand{{font-size:clamp(34px,4.2vw,48px)}}}}"
             f"</style></head><body><div class='wrap'>"
             f"<div class='slogan'>{html.escape(slogan)}</div>"
             f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
