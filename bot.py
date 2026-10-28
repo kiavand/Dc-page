@@ -351,17 +351,15 @@ def build():
             if result.returncode != 0 or not out.exists() or out.stat().st_size == 0:
                 tail = "\n".join(log.strip().splitlines()[-15:])
                 say("❌ ساخت ویدیو خطا داد.\n" + run_url() + "\n\n" + tail[-1200:])
-                shutil.move(str(job), str(FAILED / job.name))
+                # Keep the job in the queue; the next scheduled run can retry it.
                 continue
             if send_results(job, out, log):
                 job.unlink(missing_ok=True)
-            else:
-                shutil.move(str(job), str(FAILED / job.name))
+            # Retain failed uploads in the queue for the next scheduled retry.
         except Exception as exc:
             print("BUILD_ERROR:", type(exc).__name__, str(exc)[:500])
             say("❌ هنگام ساخت یا ارسال ویدیو خطا رخ داد.\n" + run_url())
-            if job.exists():
-                shutil.move(str(job), str(FAILED / job.name))
+            # Keep the job file in work/ so a later workflow run can retry it.
 
 
 if __name__ == "__main__":
