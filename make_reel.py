@@ -323,6 +323,14 @@ def icon_kind(text):
         (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت", "مربی", "جلسه", "تیمسازی"), "people"),
         (("ترس", "نگرانی", "اضطراب", "فشار", "استرس", "شکست", "اعتمادبهنفس", "انگیزه", "امید"), "heart"),
         (("سلامت", "ورزش", "بدن", "انرژی", "خواب", "تغذیه", "قدرت"), "growth"),
+        (("ایده", "خلاقیت", "الهام", "راهکار"), "bulb"),
+        (("امنیت", "محافظت", "حریم"), "shield"),
+        (("پیام", "محتوا", "گفتگو", "صحبت"), "chat"),
+        (("پیروزی", "جایزه", "قهرمان", "دستاورد"), "trophy"),
+        (("انتخاب", "جهت", "قطب"), "compass"),
+        (("قانون", "تعادل", "عدالت", "منصفانه"), "scales"),
+        (("تقویم", "مهلت", "زمانبندی", "برنامهریزی"), "calendar"),
+        (("توافق", "مشارکت", "دستدادن"), "handshake"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
@@ -333,9 +341,9 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
-def icon_svg(text, color="#FFFFFF", size=300):
+def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     """Inline, dependency-free vector icons selected from the scene topic."""
-    kind = icon_kind(text)
+    kind = kind_override or icon_kind(text)
     paths = {
         "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
         "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
@@ -348,6 +356,14 @@ def icon_svg(text, color="#FFFFFF", size=300):
         "network": "<circle cx='60' cy='22' r='10'/><circle cx='25' cy='86' r='10'/><circle cx='95' cy='86' r='10'/><circle cx='60' cy='62' r='12'/><path d='M55 32 42 52M65 32 78 52M50 70 32 79M70 70 88 79'/>",
         "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12M9 91V78c0-10 8-18 18-18M111 91V78c0-10-8-18-18-18'/>",
         "spark": "<path d='m60 8 12 37 37 15-37 12-12 37-12-37L11 60l37-15Z'/><path d='m97 9 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z'/>",
+        "bulb": "<path d='M42 76c-3-9-16-17-16-34a34 34 0 1 1 68 0c0 17-13 25-16 34Z'/><path d='M45 88h30M49 99h22M47 76h26M60 4v10M13 42h10M97 42h10M24 17l8 8M96 17l-8 8'/>",
+        "shield": "<path d='M60 10 100 25v29c0 27-17 43-40 56C37 97 20 81 20 54V25Z'/><path d='m40 59 13 13 28-31'/>",
+        "chat": "<path d='M18 23h84v58H55L32 99V81H18Z'/><path d='M34 42h52M34 58h38'/>",
+        "trophy": "<path d='M36 14h48v26c0 21-10 32-24 32S36 61 36 40Z'/><path d='M36 25H17v13c0 15 10 22 23 22M84 25h19v13c0 15-10 22-23 22M60 72v20M40 104h40M45 92h30'/>",
+        "compass": "<circle cx='60' cy='60' r='46'/><path d='m76 34-10 32-32 20 10-32Z'/><circle cx='60' cy='60' r='4'/>",
+        "scales": "<path d='M60 16v84M38 30h44M60 16l-7 8h14Z'/><path d='m28 30-16 31h32ZM92 30 76 61h32ZM40 61c-4 13-20 13-28 0M108 61c-8 13-24 13-32 0M42 100h36'/>",
+        "calendar": "<rect x='18' y='25' width='84' height='78' rx='8'/><path d='M18 44h84M39 15v20M81 15v20M36 61h12M56 61h12M76 61h12M36 78h12M56 78h12'/>",
+        "handshake": "<path d='m12 48 20-20 20 4 10 10 10-8 16 2 20 18-18 22-14-4-12 10-12-5-10 1-18-20Z'/><path d='m42 49 18 16c6 5 13-3 8-8M52 42l22 18c6 5 13-3 8-8M32 28l-9-9M88 36l10-8'/>",
     }
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
@@ -371,22 +387,18 @@ def cover_word(hook):
             return word
     tokens = re.findall(r"[\u0600-\u06FF\w]+", strip_marks(hook))
     ignored = {"از", "برای", "چطور", "چگونه", "چرا", "اگر", "این", "آن", "یک", "که", "با", "به"}
-    return next((x for x in tokens if len(x) > 2 and x not in ignored), "استمرار")
+    chosen = next((x for x in tokens if len(x) > 2 and x not in ignored), "استمرار")
+    return " ".join(chosen.split()[:2])
 
 
 def bg_html(image_path, idx, total, title):
-    """Pure-black scene with a large dimensional vector icon; no extra scene-title text."""
-    icon = icon_svg(title or "", "#FFFFFF", 390)
-    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}"
-            f"body{{font-family:{FONT};color:#fff}}"
-            f".icon{{position:absolute;left:0;right:0;top:510px;display:flex;justify-content:center;"
-            f"align-items:center;opacity:.99;transform:perspective(900px) rotateX(-4deg);"
-            f"filter:drop-shadow(0 18px 24px rgba(255,255,255,.08));}}"
-            f"</style></head><body><div class='icon'>{icon}</div></body></html>")
+    """Clean black scene plate; the icon changes together with each subtitle."""
+    return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}</style>"
+            f"</head><body></body></html>")
 
 
-def sub_html(text):
+def sub_html(text, icon_override=None):
     """Each subtitle gets its own topic-matched yellow icon and a guaranteed yellow keyword."""
     text = strip_marks(text)
     n = len(text)
@@ -413,7 +425,7 @@ def sub_html(text):
             highlighted = None
 
     # Icon is rendered in the subtitle layer, so it changes with every spoken text chunk.
-    icon = icon_svg(text, YELLOW, 132)
+    icon = icon_svg(text, YELLOW, 132, icon_override)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
             f".sub-icon{{position:absolute;left:0;right:0;top:820px;display:flex;justify-content:center;"
@@ -765,10 +777,20 @@ async def build(hook, scenes, d, dst, tag=None):
         jobs.append((bg_html(None, sh["scene"], len(scenes), sh["title"] or " ".join(sh["chunks"])), bp, False))
         bg_pngs.append(bp)
         row = []
+        previous_icon_kind = None
+        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time",
+                      "question", "network", "people", "spark")
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
-            jobs.append((sub_html(txt), sp, True))
+            chosen_kind = icon_kind(txt)
+            # Consecutive subtitle chunks never reuse the same icon.
+            if chosen_kind == previous_icon_kind:
+                seed = int(hashlib.sha256(norm(txt).encode("utf-8")).hexdigest()[:8], 16)
+                alternatives = [kind for kind in icon_kinds if kind != previous_icon_kind]
+                chosen_kind = alternatives[seed % len(alternatives)]
+            jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
+            previous_icon_kind = chosen_kind
         sub_pngs.append(row)
     outro_png = d / "outro.png"
     jobs.append((outro_html(), outro_png, False))
