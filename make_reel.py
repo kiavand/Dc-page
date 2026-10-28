@@ -779,7 +779,8 @@ async def build(hook, scenes, d, dst, tag=None):
         row = []
         previous_icon_kind = None
         icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time",
-                      "question", "network", "people", "spark")
+                      "question", "network", "people", "spark", "bulb", "shield", "chat",
+                      "trophy", "compass", "scales", "calendar", "handshake")
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
             chosen_kind = icon_kind(txt)
