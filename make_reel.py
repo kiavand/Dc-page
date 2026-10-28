@@ -373,22 +373,47 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
 
 
 def cover_word(hook):
-    """Choose a single concise Persian cover word based on topic."""
-    t = norm(hook)
-    words = [
-        (("ذهن", "فکر", "تمرکز"), "ذهن"), (("پول", "درآمد", "ثروت", "سرمایه"), "ثروت"),
-        (("هدف", "برنامه"), "هدف"), (("موفق", "پیروزی"), "موفقیت"),
-        (("آموزش", "یادگیری", "دانش"), "آموزش"), (("استمرار", "پشتکار", "عادت"), "استمرار"),
-        (("رشد", "پیشرفت"), "رشد"), (("بلاکچین", "کریپتو", "ارزدیجیتال"), "بلاکچین"),
-        (("ترس", "نگرانی"), "ترس"), (("زمان", "وقت"), "زمان"),
+    """Choose a meaningful Persian cover title: one word when clear, otherwise two."""
+    t = norm(hook).strip()
+    # Topics that can be expressed accurately in one strong word.
+    single_word_rules = [
+        (("ذهن", "فکر", "تمرکز", "هوش ذهنی"), "ذهن"),
+        (("پول", "درآمد", "ثروت", "سرمایه", "هوش مالی", "مدیریت مالی"), "ثروت"),
+        (("هدف", "هدفگذاری", "هدف گذاری"), "هدف"),
+        (("موفقیت", "موفق", "پیروزی"), "موفقیت"),
+        (("آموزش", "یادگیری", "دانش", "مطالعه"), "یادگیری"),
+        (("استمرار", "پشتکار", "عادت"), "استمرار"),
+        (("رشد", "پیشرفت", "توسعه فردی"), "رشد"),
+        (("بلاکچین", "کریپتو", "ارز دیجیتال", "ارزدیجیتال"), "بلاکچین"),
+        (("ترس", "نگرانی", "اضطراب"), "ترس"),
+        (("زمان", "وقت", "مدیریت زمان"), "زمان"),
+        (("انگیزه", "انگیزشی"), "انگیزه"),
+        (("اعتماد", "اعتمادسازی"), "اعتماد"),
+        (("رهبری", "رهبر", "لیدرشیپ"), "رهبری"),
+        (("ارتباطات", "ارتباط", "روابط عمومی", "مهارت ارتباطی"), "ارتباطات"),
+        (("نتورک", "شبکه سازی", "شبکهسازی", "تیم سازی", "تیمسازی"), "تیم‌سازی"),
     ]
-    for keys, word in words:
+    for keys, word in single_word_rules:
         if any(norm(k) in t for k in keys):
+            # For broad phrases such as "دنیای ارتباطات", keep the useful topic phrase.
+            if any(norm(k) in t for k in ("دنیای ارتباطات", "دنیای رابطه", "مهارت ارتباطی", "روابط عمومی")):
+                return "دنیای ارتباطات" if "دنیای ارتباطات" in t else ("مهارت ارتباطی" if "مهارت ارتباطی" in t else "ارتباطات")
             return word
-    tokens = re.findall(r"[\u0600-\u06FF\w]+", strip_marks(hook))
-    ignored = {"از", "برای", "چطور", "چگونه", "چرا", "اگر", "این", "آن", "یک", "که", "با", "به"}
-    chosen = next((x for x in tokens if len(x) > 2 and x not in ignored), "استمرار")
-    return " ".join(chosen.split()[:2])
+
+    # Strip leading question/filler words, then keep the first two content words.
+    tokens = re.findall(r"[\u0600-\u06FF\w]+(?:‌[\u0600-\u06FF\w]+)?", strip_marks(hook))
+    ignored = {"از", "برای", "چطور", "چگونه", "چرا", "اگر", "این", "آن", "یک", "که", "با", "به",
+               "در", "را", "و", "یا", "تا", "آیا", "چه", "چی", "میشه", "شود", "است", "هست", "درباره"}
+    chosen = [x for x in tokens if norm(x) not in ignored and len(norm(x)) > 1]
+    if not chosen:
+        return "موضوع مهم"
+    # A single word is fine only when it is a meaningful topic, not a vague opener like «دنیای».
+    vague = {"دنیای", "جهان", "چیز", "موضوع", "راه", "روش", "نکته", "راز", "اصل"}
+    if len(chosen) >= 2 and (norm(chosen[0]) in vague or len(chosen[0]) < 4):
+        return " ".join(chosen[:2])
+    if len(chosen) >= 2 and not any(norm(k) in t for keys, _ in single_word_rules for k in keys):
+        return " ".join(chosen[:2])
+    return chosen[0]
 
 
 def bg_html(image_path, idx, total, title):
@@ -425,7 +450,7 @@ def sub_html(text, icon_override=None):
             highlighted = None
 
     # Icon is rendered in the subtitle layer, so it changes with every spoken text chunk.
-    icon = icon_svg(text, YELLOW, 132, icon_override)
+    icon = icon_svg(text, YELLOW, 168, icon_override)
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
             f"<style>html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
             f".sub-icon{{position:absolute;left:0;right:0;top:820px;display:flex;justify-content:center;"
