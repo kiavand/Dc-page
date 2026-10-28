@@ -31,9 +31,11 @@ W, H, FPS = 1080, 1920, 30
 VOICE = "fa-IR-FaridNeural"      # male Persian voice
 RATE = "-5%"
 USE_DIACRITICS_FOR_VOICE = True   # set False if the voice mispronounces marked text
-GAP = 0.28                       # pause between sentences (s)
+GAP = 0.32                       # pause between sentences (s)
+OPENING_LEAD = 0.50              # silence before the first spoken word
+COVER_PAUSE = 0.90               # pause after the cover word before body narration
 TAIL = 0.45                      # pause at the end of each scene (s)
-COVER_MIN = 2.6                  # minimum cover length (s)
+COVER_MIN = 3.0                  # cover stays visible long enough to read the word
 OUTRO = 2.4                      # end card length (s)
 PAGE_HANDLE = ""  # no handle is displayed inside the video
 MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   # default.png + optional <mood>.png
@@ -271,9 +273,14 @@ def concat_wavs(paths, dst, d):
          "-c", "copy", str(dst)])
 
 
-async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL):
+async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     """Return (scene_wav, [(sentence, start, end)], total_duration)."""
     wavs, timing, t = [], [], 0.0
+    if lead > 0:
+        lead_wav = d / f"a{idx:02d}_lead.wav"
+        silence_wav(lead_wav, lead)
+        wavs.append(lead_wav)
+        t += lead
     for j, ch in enumerate(chunks):
         mp3 = d / f"a{idx:02d}_{j:02d}.mp3"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
@@ -331,6 +338,12 @@ def icon_kind(text):
         (("قانون", "تعادل", "عدالت", "منصفانه"), "scales"),
         (("تقویم", "مهلت", "زمانبندی", "برنامهریزی"), "calendar"),
         (("توافق", "مشارکت", "دستدادن"), "handshake"),
+        (("برق", "سریع", "شتاب", "فوری", "قدرت"), "lightning"),
+        (("چشم", "دیدن", "مشاهده", "توجه", "آگاهی"), "eye"),
+        (("قفل", "امنیت", "حفاظت", "محرمانه"), "lock"),
+        (("قله", "مسیر سخت", "صعود", "بلندپروازی"), "mountain"),
+        (("پرچم", "پیشرو", "رکورد", "رقابت"), "flag"),
+        (("پیچیده", "ترکیب", "حل مسئله", "راهحل"), "puzzle"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
@@ -364,6 +377,13 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         "scales": "<path d='M60 16v84M38 30h44M60 16l-7 8h14Z'/><path d='m28 30-16 31h32ZM92 30 76 61h32ZM40 61c-4 13-20 13-28 0M108 61c-8 13-24 13-32 0M42 100h36'/>",
         "calendar": "<rect x='18' y='25' width='84' height='78' rx='8'/><path d='M18 44h84M39 15v20M81 15v20M36 61h12M56 61h12M76 61h12M36 78h12M56 78h12'/>",
         "handshake": "<path d='m12 48 20-20 20 4 10 10 10-8 16 2 20 18-18 22-14-4-12 10-12-5-10 1-18-20Z'/><path d='m42 49 18 16c6 5 13-3 8-8M52 42l22 18c6 5 13-3 8-8M32 28l-9-9M88 36l10-8'/>",
+        "lightning": "<path d='M68 8 25 66h28l-5 46 47-65H65Z'/>",
+        "flag": "<path d='M25 108V12M27 18h65L78 40l14 20H27'/>",
+        "mountain": "<path d='m8 100 35-62 18 28 13-19 38 53Z'/><path d='m30 61 13-23 18 28 13-19 12 19'/>",
+        "lock": "<rect x='22' y='49' width='76' height='55' rx='8'/><path d='M38 49V34a22 22 0 0 1 44 0v15M60 68v17'/>",
+        "eye": "<path d='M8 60s18-30 52-30 52 30 52 30-18 30-52 30S8 60 8 60Z'/><circle cx='60' cy='60' r='14'/>",
+        "puzzle": "<path d='M20 20h25a12 12 0 1 1 24 0h31v31a12 12 0 1 0 0 24v25H69a12 12 0 1 0-24 0H20V69a12 12 0 1 0 0-24Z'/>",
+        "flag": "<path d='M25 108V12M27 18h65L78 40l14 20H27'/>",
     }
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
@@ -783,7 +803,10 @@ async def build(hook, scenes, d, dst, tag=None):
         raise ValueError("Input file has no readable scenes.")
 
     # Audio flow intentionally remains cover -> scenes -> silent branded outro.
-    audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN)]
+    cover_spoken_word = cover_word(hook)
+    # Read only the word shown on the cover, then leave a clear pause before the main text.
+    audio = [await build_scene_audio(0, [cover_spoken_word], d, min_total=COVER_MIN,
+                                     tail=COVER_PAUSE, lead=OPENING_LEAD)]
     for k, sh in enumerate(shots, start=1):
         audio.append(await build_scene_audio(k, sh["chunks"], d,
                                              tail=TAIL if k == len(shots) else GAP))
@@ -802,21 +825,24 @@ async def build(hook, scenes, d, dst, tag=None):
         jobs.append((bg_html(None, sh["scene"], len(scenes), sh["title"] or " ".join(sh["chunks"])), bp, False))
         bg_pngs.append(bp)
         row = []
-        previous_icon_kind = None
+        recent_icon_kinds = []
         icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time",
                       "question", "network", "people", "spark", "bulb", "shield", "chat",
-                      "trophy", "compass", "scales", "calendar", "handshake")
+                      "trophy", "compass", "scales", "calendar", "handshake", "lightning",
+                      "flag", "mountain", "lock", "eye", "puzzle")
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
             chosen_kind = icon_kind(txt)
-            # Consecutive subtitle chunks never reuse the same icon.
-            if chosen_kind == previous_icon_kind:
+            # Avoid repeated icons across the last three subtitles, while keeping semantic matches.
+            if chosen_kind in recent_icon_kinds:
                 seed = int(hashlib.sha256(norm(txt).encode("utf-8")).hexdigest()[:8], 16)
-                alternatives = [kind for kind in icon_kinds if kind != previous_icon_kind]
-                chosen_kind = alternatives[seed % len(alternatives)]
+                alternatives = [kind for kind in icon_kinds if kind not in recent_icon_kinds]
+                if alternatives:
+                    chosen_kind = alternatives[seed % len(alternatives)]
             jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
-            previous_icon_kind = chosen_kind
+            recent_icon_kinds.append(chosen_kind)
+            recent_icon_kinds = recent_icon_kinds[-3:]
         sub_pngs.append(row)
     outro_png = d / "outro.png"
     jobs.append((outro_html(), outro_png, False))
