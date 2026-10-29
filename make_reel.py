@@ -25,10 +25,15 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import json
+import os
 from pathlib import Path
 
 W, H, FPS = 1080, 1920, 30
-VOICE = "fa-IR-FaridNeural"      # male Persian voice
+VOICE = "fa-IR-FaridNeural"      # Edge TTS fallback voice
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "elevenlabs").strip().lower()
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "PEdcOLzbXYhL8IKOswXB").strip()
+ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_v3").strip()
 RATE = "-5%"
 USE_DIACRITICS_FOR_VOICE = True   # set False if the voice mispronounces marked text
 GAP = 0.32                       # pause between sentences (s)
@@ -272,19 +277,74 @@ def fetch_image(prompt, path, seed):
 
 # ---------------------------------------------------------------- speech
 async def tts(text, out_mp3):
-    """Generate speech robustly; retry transient Edge TTS failures and reject empty files."""
-    import edge_tts
-
+    """Generate MP3 with ElevenLabs or Edge TTS, validating output before use."""
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text; refusing to create a silent/invalid audio file.")
 
     out_mp3 = Path(out_mp3)
+    tmp_mp3 = out_mp3.with_name(out_mp3.stem + ".partial" + out_mp3.suffix)
+    tmp_mp3.unlink(missing_ok=True)
+
+    if TTS_PROVIDER == "elevenlabs":
+        api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+        voice_id = ELEVENLABS_VOICE_ID
+        if not api_key:
+            raise RuntimeError(
+                "TTS_PROVIDER is 'elevenlabs' but ELEVENLABS_API_KEY is missing. "
+                "Add it to GitHub Actions repository secrets."
+            )
+        if not voice_id:
+            raise RuntimeError("ELEVENLABS_VOICE_ID is empty.")
+
+        url = (
+            "https://api.elevenlabs.io/v1/text-to-speech/"
+            + urllib.parse.quote(voice_id, safe="")
+            + "?output_format=mp3_44100_128"
+        )
+        payload = {
+            "text": text,
+            "model_id": ELEVENLABS_MODEL_ID,
+            "voice_settings": {
+                "stability": 0.45,
+                "similarity_boost": 0.75
+            }
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "xi-api-key": api_key,
+                "Content-Type": "application/json",
+                "Accept": "audio/mpeg",
+                "User-Agent": UA,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as response:
+                audio = response.read()
+            if len(audio) < 1024 or not audio.startswith(b"ID3") and not audio.startswith(b"\xff\xfb") and not audio.startswith(b"\xff\xf3") and not audio.startswith(b"\xff\xf2"):
+                # Some valid MP3 streams start with an MPEG frame other than the common headers.
+                if len(audio) < 1024:
+                    raise RuntimeError("ElevenLabs returned an empty or unusually small audio response.")
+            tmp_mp3.write_bytes(audio)
+            tmp_mp3.replace(out_mp3)
+            return
+        except Exception as e:
+            tmp_mp3.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"ElevenLabs TTS failed for {len(text)} characters using voice {voice_id!r}: "
+                f"{type(e).__name__}: {e}"
+            ) from e
+
+    if TTS_PROVIDER != "edge":
+        raise ValueError(f"Unsupported TTS_PROVIDER={TTS_PROVIDER!r}. Use 'elevenlabs' or 'edge'.")
+
+    import edge_tts
     last = None
-    # Exponential backoff helps with temporary rate limits/network/service hiccups.
     delays = (2, 4, 8, 12, 16)
     for attempt, delay in enumerate(delays, start=1):
-        tmp_mp3 = out_mp3.with_name(out_mp3.stem + ".partial" + out_mp3.suffix)
         try:
             tmp_mp3.unlink(missing_ok=True)
             await edge_tts.Communicate(text, VOICE, rate=RATE).save(str(tmp_mp3))
@@ -298,16 +358,12 @@ async def tts(text, out_mp3):
         except Exception as e:
             last = e
             tmp_mp3.unlink(missing_ok=True)
-            print(
-                f"TTS attempt {attempt}/{len(delays)} failed; "
-                f"text length={len(text)}; error={type(e).__name__}: {e}"
-            )
+            print(f"Edge TTS attempt {attempt}/{len(delays)} failed; text length={len(text)}; error={type(e).__name__}: {e}")
             if attempt < len(delays):
                 await asyncio.sleep(delay)
-
     raise RuntimeError(
-        f"TTS failed after {len(delays)} attempts for {len(text)} characters "
-        f"using voice {VOICE!r}. Last error: {type(last).__name__}: {last}"
+        f"Edge TTS failed after {len(delays)} attempts for {len(text)} characters. "
+        f"Last error: {type(last).__name__}: {last}"
     ) from last
 
 
