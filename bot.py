@@ -16,7 +16,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reel import UA, norm, strip_marks
+from make_reel import norm, strip_marks
+
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
