@@ -1,12 +1,12 @@
 """
-Persian Reel builder v3.2 (Visual Debug & Dynamic Dark Theme).
+Persian Reel builder v3.3 (Optimized Outro & Extended Smart Icons).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature dynamic dark animated gradient with topic-matched inline vector icons.
+Backgrounds feature dynamic dark animated gradient with extended smart vector icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -35,11 +35,10 @@ TAIL = 0.45                      # pause at the end of each scene (s)
 COVER_MIN = 3.0                  # cover stays visible long enough to read the word
 OUTRO = 2.4                      # end card length (s)
 PAGE_HANDLE = ""                 # no handle is displayed inside the video
-MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   # default.png + optional <mood>.png
+MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
 
-# ---- fixed cover template: only the hook text changes between reels
 COVER_TAG = "آقای استمرار | Mr.Continuity"
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 BRAND_HANDLE = ""  
@@ -48,7 +47,7 @@ YELLOW = "#FFD21F"
 STYLE = (", realistic photo, natural light, shallow depth of field, high quality, "
          "vertical 9:16, no text, no letters, no logos")
 FALLBACK_PROMPT = "candid photo of friendly people talking in a bright modern office, warm light"
-MAX_SHOTS = 16                   # most pictures used in one reel
+MAX_SHOTS = 16                   
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -58,12 +57,14 @@ FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
 
 KEYWORDS = [
     (("ثبتنام", "عضویت", "فرم"), "candid photo of two people filling out a form"),
-    (("تیمسازی", "تیم", "همتیم"), "candid photo of a diverse team collaborating"),
+    (("تیمسازی", "تیم", "همتیم", "وابسته"), "candid photo of a diverse team collaborating"),
     (("قهوه", "کافه"), "candid photo of two people talking over coffee"),
     (("دیدار", "حضوری", "ملاقات", "رودرو"), "candid photo of two people shaking hands"),
     (("جلسه",), "candid photo of a small team meeting"),
     (("اعتماد", "همراهی", "کنارش"), "candid photo of trust and partnership"),
-    (("هدف", "رشد", "موفقیت", "شروع"), "candid photo of a hopeful person at sunrise"),
+    (("هدف", "رشد", "موفقیت", "شروع", "توانمندسازی"), "candid photo of a hopeful person at sunrise"),
+    (("رهبر", "استقلال", "مسئولیت", "تصمیم"), "candid photo of a confident leader guiding a team"),
+    (("آموزش", "یادگیری", "تمرین"), "candid photo of people learning and training together"),
 ]
 
 # ---------------------------------------------------------------- text
@@ -239,26 +240,32 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- vector icons & graphics
+# ---------------------------------------------------------------- extended smart icons
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
         (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری"), "brain"),
-        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد", "فروش", "قیمت"), "money"),
+        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد"), "money"),
         (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم", "شروع", "نتیجه", "اولویت"), "target"),
-        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود"), "growth"),
-        (("کتاب", "یادگیری", "آموزش", "دانش", "مطالعه", "مهارت"), "book"),
+        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود", "توانمندسازی"), "growth"),
+        (("کتاب", "آموزش", "دانش", "مطالعه", "مهارت", "درس"), "book"),
         (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد", "احترام", "ارتباط"), "heart"),
         (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "انضباط"), "time"),
         (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش", "مشکل"), "question"),
         (("بلاکچین", "کریپتو", "تکنولوژی", "فناوری", "شبکه", "هوشمصنوعی"), "network"),
-        (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت"), "people"),
+        (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت", "وابسته", "استقلال"), "people"),
         (("ایده", "خلاقیت", "الهام", "راهکار"), "bulb"),
+        (("مسئولیت", "وظیفه", "تعهد", "پذیرش"), "shield"),
+        (("قوانین", "اصول", "ساختار", "تنظیم"), "sliders"),
+        (("قدرت", "انرژی", "شتاب", "فوری"), "zap"),
+        (("برنده", "جایزه", "افتخار", "موفق"), "trophy"),
+        (("انتخاب", "جهت", "قطب‌نما"), "compass"),
+        (("مدارک", "قرارداد", "اسناد", "برنامه‌ریزی"), "calendar"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
             return kind
-    choices = ("target", "brain", "network", "book", "people", "growth", "question", "time", "heart", "money")
+    choices = ("target", "brain", "network", "book", "people", "growth", "question", "time", "heart", "money", "shield", "sliders", "zap", "trophy", "compass", "calendar")
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
@@ -276,6 +283,12 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
         "network": "<circle cx='60' cy='22' r='10'/><circle cx='25' cy='86' r='10'/><circle cx='95' cy='86' r='10'/><circle cx='60' cy='62' r='12'/><path d='M55 32 42 52M65 32 78 52M50 70 32 79M70 70 88 79'/>",
         "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12'/>",
         "bulb": "<path d='M42 76c-3-9-16-17-16-34a34 34 0 1 1 68 0c0 17-13 25-16 34Z'/><path d='M45 88h30M49 99h22M47 76h26'/>",
+        "shield": "<path d='M60 10l40 15v29c0 27-17 43-40 56C37 97 20 81 20 54V25Z'/>",
+        "sliders": "<path d='M18 32h84M18 60h84M18 88h84M40 24v16M70 52v16M50 80v16'/>",
+        "zap": "<path d='M68 8L25 66h28l-5 46 47-65H65Z'/>",
+        "trophy": "<path d='M36 14h48v26c0 21-10 32-24 32S36 61 36 40Z'/><path d='M36 25H17v13c0 15 10 22 23 22M84 25h19v13c0 15-10 22-23 22'/>",
+        "compass": "<circle cx='60' cy='60' r='46'/><path d='m76 34-10 32-32 20 10-32Z'/>",
+        "calendar": "<rect x='18' y='25' width='84' height='78' rx='8'/><path d='M18 44h84M39 15v20M81 15v20'/>",
     }
     path_data = paths.get(kind, paths["target"])
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
@@ -295,6 +308,7 @@ def cover_word(hook):
         (("اعتماد به نفس", "اعتمادبنفس"), "اعتمادبه‌نفس"),
         (("مدیریت پول", "درآمد بیشتر"), "رشد مالی"),
         (("عادت های درست", "ساختن عادت"), "عادت‌سازی"),
+        (("رهبری مستقل", "وابسته‌سازی"), "رهبری مستقل"),
     ]
     for phrases, label in hook_phrases:
         if any(norm(phrase) in t for phrase in phrases):
@@ -306,9 +320,8 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts (Visible Debug & Dynamic Dark Theme)
+# ---------------------------------------------------------------- HTML Layouts
 def bg_html(image_path, idx, total, title):
-    """Debug & Dynamic Background with a clear visible purple-dark pulse gradient to confirm updates."""
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
@@ -334,7 +347,7 @@ def sub_html(text, icon_override=None):
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
 
     keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "بلاکچین", "درآمد", "تلاش",
-                      "تیم", "رهبری", "اعتماد", "ترس", "شکست", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان"]
+                      "تیم", "رهبری", "اعتماد", "ترس", "شکست", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت"]
     normalized = norm(text)
     highlighted = next((w for w in keyword_groups if norm(w) in normalized), None)
     if not highlighted:
@@ -383,7 +396,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".icon{{margin-bottom:36px;display:flex;align-items:center;justify-content:center}}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:126px;line-height:1.35;max-width:900px;"
+        f".word{{color:{YELLOW};font-weight:800;font-size:120px;line-height:1.35;max-width:950px;"
         f"text-shadow: 0 0 35px rgba(255,210,31,0.3);}}"
         f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:39px;font-weight:800;color:#fff}}"
         f"</style></head><body>"
@@ -401,11 +414,11 @@ def outro_html(mascot=False):
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
-        f"text-align:center}}.wrap{{width:940px;display:flex;flex-direction:column;align-items:center;"
-        f"justify-content:center;gap:42px}}"
-        f".slogan{{font-size:94px;font-weight:800;line-height:1.65;color:{YELLOW};"
-        f"text-shadow:0 0 30px rgba(255,210,31,.3)}}"
-        f".brand{{font-size:48px;font-weight:800;color:{YELLOW};line-height:1.5}}"
+        f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
+        f"justify-content:center;gap:32px}}"
+        f".slogan{{font-size:72px;font-weight:800;line-height:1.4;color:{YELLOW};"
+        f"white-space:nowrap;text-shadow:0 0 30px rgba(255,210,31,.3)}}"
+        f".brand{{font-size:44px;font-weight:800;color:#fff;line-height:1.5}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -523,7 +536,7 @@ async def build(hook, scenes, d, dst, tag=None):
         bg_pngs.append(bp)
         row = []
         recent_icon_kinds = []
-        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "network", "people", "bulb")
+        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "network", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar")
         
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
@@ -536,7 +549,7 @@ async def build(hook, scenes, d, dst, tag=None):
             jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
             recent_icon_kinds.append(chosen_kind)
-            recent_icon_kinds = recent_icon_kinds[-3:]
+            recent_icon_kinds = recent_icon_kinds[-2:] # keep window smaller to allow higher variety rotation
         sub_pngs.append(row)
         
     outro_png = d / "outro.png"
