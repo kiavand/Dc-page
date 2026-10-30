@@ -1,12 +1,11 @@
 """
-Persian Reel builder v3.6 (Edge-TTS Integration & Matte Dark Theme).
+Persian Reel builder v4.0 (Ultimate Cinematic Matte Dark & Smart Icons).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
-                                   (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a comfortable matte dark aesthetic with Edge-TTS voice.
+Backgrounds feature a high-end cinematic matte dark aesthetic with dynamic icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -27,45 +26,22 @@ import edge_tts
 from pathlib import Path
 
 W, H, FPS = 1080, 1920, 30
-GAP = 0.32                       # pause between sentences (s)
+GAP = 0.30                       # pause between sentences (s)
 OPENING_LEAD = 0.50              # silence before the first spoken word
 COVER_PAUSE = 0.90               # pause after the cover word before body narration
 TAIL = 0.45                      # pause at the end of each scene (s)
 COVER_MIN = 3.0                  # cover stays visible long enough to read the word
 OUTRO = 2.4                      # end card length (s)
-PAGE_HANDLE = ""                 # no handle is displayed inside the video
-MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
-COVER_TAG = "آقای استمرار | Mr.Continuity"
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
-BRAND_HANDLE = ""  
 YELLOW = "#FFD21F"
-
-STYLE = (", realistic photo, natural light, shallow depth of field, high quality, "
-         "vertical 9:16, no text, no letters, no logos")
-FALLBACK_PROMPT = "candid photo of friendly people talking in a bright modern office, warm light"
-MAX_SHOTS = 16                   
-UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
 FONT_LINK = ('<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:'
              'wght@500;800&display=swap" rel="stylesheet">')
 FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
-
-KEYWORDS = [
-    (("ثبتنام", "عضویت", "فرم"), "candid photo of two people filling out a form"),
-    (("تیمسازی", "تیم", "همتیم", "وابسته"), "candid photo of a diverse team collaborating"),
-    (("قهوه", "کافه"), "candid photo of two people talking over coffee"),
-    (("دیدار", "حضوری", "ملاقات", "رودرو"), "candid photo of two people shaking hands"),
-    (("جلسه",), "candid photo of a small team meeting"),
-    (("اعتماد", "همراهی", "کنارش"), "candid photo of trust and partnership"),
-    (("هدف", "رشد", "موفقیت", "شروع", "توانمندسازی"), "candid photo of a hopeful person at sunrise"),
-    (("رهبر", "استقلال", "مسئولیت", "تصمیم"), "candid photo of a confident leader guiding a team"),
-    (("آموزش", "یادگیری", "تمرین"), "candid photo of people learning and training together"),
-]
 
 # ---------------------------------------------------------------- text
 MARKS = re.compile("[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]")
@@ -159,7 +135,6 @@ def split_chunks(text, max_chars=72):
 
 # ---------------------------------------------------------------- Edge-TTS
 async def tts(text, out_wav):
-    """Generate Persian speech using Edge-TTS."""
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
@@ -222,32 +197,31 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- extended smart icons
+# ---------------------------------------------------------------- smart icons
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
         (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری"), "brain"),
-        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد"), "money"),
-        (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم", "شروع", "نتیجه", "اولویت"), "target"),
-        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود", "توانمندسازی"), "growth"),
-        (("کتاب", "آموزش", "دانش", "مطالعه", "مهارت", "درس"), "book"),
-        (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد", "احترام", "ارتباط"), "heart"),
+        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "اقتصاد"), "money"),
+        (("هدف", "موفقیت", "مسیر", "شروع", "نتیجه", "اولویت"), "target"),
+        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود"), "growth"),
+        (("کتاب", "آموزش", "دانش", "مطالعه", "مهارت"), "book"),
+        (("عشق", "رابطه", "اعتماد", "ارتباط"), "heart"),
         (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "انضباط"), "time"),
-        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش", "مشکل"), "question"),
-        (("بلاکچین", "کریپتو", "تکنولوژی", "فناوری", "شبکه", "هوشمصنوعی"), "network"),
-        (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت", "وابسته", "استقلال"), "people"),
+        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "مشکل"), "question"),
+        (("تیم", "رهبری", "همکاری", "گروه", "استقلال", "انعطاف"), "people"),
         (("ایده", "خلاقیت", "الهام", "راهکار"), "bulb"),
-        (("مسئولیت", "وظیفه", "تعهد", "پذیرش"), "shield"),
-        (("قوانین", "اصول", "ساختار", "تنظیم"), "sliders"),
-        (("قدرت", "انرژی", "شتاب", "فوری"), "zap"),
-        (("برنده", "جایزه", "افتخار", "موفق"), "trophy"),
+        (("مسئولیت", "تعهد", "پذیرش"), "shield"),
+        (("قوانین", "اصول", "ساختار"), "sliders"),
+        (("قدرت", "انرژی", "شتاب"), "zap"),
+        (("برنده", "جایزه", "افتخار"), "trophy"),
         (("انتخاب", "جهت", "قطب‌نما"), "compass"),
-        (("مدارک", "قرارداد", "اسناد", "برنامه‌ریزی"), "calendar"),
+        (("برنامه‌ریزی", "تقویم", "اسناد"), "calendar"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
             return kind
-    choices = ("target", "brain", "network", "book", "people", "growth", "question", "time", "heart", "money", "shield", "sliders", "zap", "trophy", "compass", "calendar")
+    choices = ("target", "brain", "growth", "time", "bulb", "compass", "trophy", "shield")
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
@@ -262,7 +236,6 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
         "heart": "<path d='M60 99 20 61C-3 36 28 9 49 29l11 11 11-11c21-20 52 7 29 32Z'/>",
         "time": "<circle cx='60' cy='60' r='42'/><path d='M60 34v28l20 13'/>",
         "question": "<path d='M38 42c2-27 42-31 48-6 4 18-22 21-25 39'/><circle cx='60' cy='91' r='3'/>",
-        "network": "<circle cx='60' cy='22' r='10'/><circle cx='25' cy='86' r='10'/><circle cx='95' cy='86' r='10'/><circle cx='60' cy='62' r='12'/><path d='M55 32 42 52M65 32 78 52M50 70 32 79M70 70 88 79'/>",
         "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12'/>",
         "bulb": "<path d='M42 76c-3-9-16-17-16-34a34 34 0 1 1 68 0c0 17-13 25-16 34Z'/><path d='M45 88h30M49 99h22M47 76h26'/>",
         "shield": "<path d='M60 10l40 15v29c0 27-17 43-40 56C37 97 20 81 20 54V25Z'/>",
@@ -276,7 +249,7 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' "
-            f"style='filter:drop-shadow(0 0 16px rgba(255,210,31,.35));'>"
+            f"style='filter:drop-shadow(0 0 20px rgba(255,210,31,0.45));'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
 
@@ -302,18 +275,24 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts (Matte Dark Theme)
+# ---------------------------------------------------------------- HTML Layouts (Cinematic Matte Dark)
 def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
-        f".bg-matte {{"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
+        f".bg-cinematic {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: radial-gradient(circle at 50% 40%, rgba(30,30,42,0.6) 0%, rgba(11,11,14,0.98) 75%);"
+        f"  background: radial-gradient(circle at 50% 35%, rgba(35,35,55,0.7) 0%, rgba(8,8,12,0.99) 80%);"
+        f"}}"
+        f".glow-orb {{"
+        f"  position: absolute; width: 600px; height: 600px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
+        f"  background: radial-gradient(circle, rgba(255,210,31,0.06) 0%, rgba(0,0,0,0) 70%);"
+        f"  border-radius: 50%; pointer-events: none;"
         f"}}"
         f"</style></head><body>"
-        f"<div class='bg-matte'></div>"
+        f"<div class='bg-cinematic'></div>"
+        f"<div class='glow-orb'></div>"
         f"</body></html>"
     )
 
@@ -323,8 +302,8 @@ def sub_html(text, icon_override=None):
     n = len(text)
     size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
 
-    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "بلاکچین", "درآمد", "تلاش",
-                      "تیم", "رهبری", "اعتماد", "ترس", "شکست", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت"]
+    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "درآمد", "تلاش",
+                      "تیم", "رهبری", "اعتماد", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت", "انعطاف"]
     normalized = norm(text)
     highlighted = next((w for w in keyword_groups if norm(w) in normalized), None)
     if not highlighted:
@@ -344,17 +323,17 @@ def sub_html(text, icon_override=None):
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:730px;display:flex;justify-content:center;"
-        f"align-items:center;animation: popIcon 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);}}"
-        f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
-        f".b{{max-width:920px;background:rgba(18,18,24,0.94);color:#f3f4f6;font-family:{FONT};"
-        f"font-weight:800;font-size:{size}px;line-height:1.65;padding:26px 38px;"
-        f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.08);"
-        f"box-shadow: 0 16px 40px rgba(0,0,0,0.6);}}"
-        f".kw{{color:{YELLOW};text-shadow:0 0 16px rgba(255,210,31,.35)}}"
-        f".brand{{position:absolute;left:0;right:0;top:1500px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};font-size:38px;font-weight:800;text-shadow:0 0 20px rgba(255,210,31,.25)}}"
-        f"@keyframes popIcon {{ 0% {{ transform: scale(0.8); opacity: 0; }} 100% {{ transform: scale(1); opacity: 1; }} }}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:710px;display:flex;justify-content:center;"
+        f"align-items:center;animation: popIcon 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);}}"
+        f".w{{position:absolute;left:50px;right:50px;top:1010px;display:flex;justify-content:center}}"
+        f".b{{max-width:940px;background:rgba(14,14,20,0.95);color:#f3f4f6;font-family:{FONT};"
+        f"font-weight:800;font-size:{size}px;line-height:1.65;padding:28px 40px;"
+        f"border-radius:30px;text-align:center;border:2px solid rgba(255,210,31,0.15);"
+        f"box-shadow: 0 20px 50px rgba(0,0,0,0.75);}}"
+        f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
+        f".brand{{position:absolute;left:0;right:0;top:1520px;text-align:center;color:{YELLOW};"
+        f"font-family:{FONT};font-size:36px;font-weight:800;opacity:0.9;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
+        f"@keyframes popIcon {{ 0% {{ transform: scale(0.7); opacity: 0; }} 100% {{ transform: scale(1); opacity: 1; }} }}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
@@ -365,18 +344,20 @@ def sub_html(text, icon_override=None):
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
     word = cover_word(hook)
-    icon = icon_svg(word, YELLOW, 330)
+    icon = icon_svg(word, YELLOW, 340)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
-        f".icon{{margin-bottom:36px;display:flex;align-items:center;justify-content:center}}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:120px;line-height:1.35;max-width:950px;"
-        f"text-shadow: 0 0 35px rgba(255,210,31,0.25);}}"
-        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:39px;font-weight:800;color:#fff}}"
+        f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
+        f".icon{{margin-bottom:40px;display:flex;align-items:center;justify-content:center;z-index:2}}"
+        f".word{{color:{YELLOW};font-weight:800;font-size:125px;line-height:1.35;max-width:960px;"
+        f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
+        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;color:#fff;z-index:2}}"
         f"</style></head><body>"
+        f"<div class='bg-glow'></div>"
         f"<div class='icon'>{icon}</div>"
         f"<div class='word'>{html.escape(word)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -389,12 +370,12 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
-        f"justify-content:center;gap:28px}}"
-        f".slogan{{font-size:66px;font-weight:800;line-height:1.4;color:{YELLOW};"
-        f"white-space:nowrap;text-shadow:0 0 30px rgba(255,210,31,.25)}}"
+        f"justify-content:center;gap:30px}}"
+        f".slogan{{font-size:68px;font-weight:800;line-height:1.4;color:{YELLOW};"
+        f"white-space:nowrap;text-shadow:0 0 35px rgba(255,210,31,0.35)}}"
         f".brand{{font-size:42px;font-weight:800;color:#f3f4f6;line-height:1.5}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
@@ -415,7 +396,6 @@ def render_pages(jobs):
         browser.close()
 
 
-# ---------------------------------------------------------------- video rendering
 def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
     length = dur + (0 if is_last else XFADE)
     frames = int(length * FPS) + 2
@@ -480,7 +460,6 @@ def assemble(clips, durs, voice_wav, music, out):
     run(cmd)
 
 
-# ---------------------------------------------------------------- main build engine
 async def build(hook, scenes, d, dst, tag=None):
     shots = []
     for i, sc in enumerate(scenes, start=1):
@@ -513,7 +492,7 @@ async def build(hook, scenes, d, dst, tag=None):
         bg_pngs.append(bp)
         row = []
         recent_icon_kinds = []
-        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "network", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar")
+        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar")
         
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
