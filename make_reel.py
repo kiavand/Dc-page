@@ -1,12 +1,12 @@
 """
-Persian Reel builder v3.4 (Eye-Friendly Matte Dark Theme & Smart Icons).
+Persian Reel builder v3.5 (Hugging Face TTS Integration & Matte Dark Theme).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a comfortable matte dark aesthetic with high-contrast text cards.
+Backgrounds feature a comfortable matte dark aesthetic with Hugging Face AI voice.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -15,6 +15,7 @@ import asyncio
 import base64
 import hashlib
 import html
+import os
 import random
 import re
 import subprocess
@@ -22,12 +23,10 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import requests
 from pathlib import Path
 
 W, H, FPS = 1080, 1920, 30
-VOICE = "fa-IR-FaridNeural"      # male Persian voice
-RATE = "-5%"
-USE_DIACRITICS_FOR_VOICE = True   # set False if the voice mispronounces marked text
 GAP = 0.32                       # pause between sentences (s)
 OPENING_LEAD = 0.50              # silence before the first spoken word
 COVER_PAUSE = 0.90               # pause after the cover word before body narration
@@ -73,10 +72,6 @@ MARKS = re.compile("[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]")
 
 def strip_marks(s):
     return MARKS.sub("", (s or "").replace("\u06C0", "\u0647"))
-
-
-def speak_text(s):
-    return s if USE_DIACRITICS_FOR_VOICE else strip_marks(s)
 
 
 def norm(s):
@@ -161,28 +156,34 @@ def split_chunks(text, max_chars=72):
     return merged
 
 
-# ---------------------------------------------------------------- speech
-async def tts(text, out_mp3):
-    import edge_tts
+# ---------------------------------------------------------------- Hugging Face TTS
+async def tts(text, out_wav):
+    """Generate Persian speech using Hugging Face Inference API (facebook/mms-tts-fas)."""
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
-    out_mp3 = Path(out_mp3)
+    
+    token = os.environ.get("HF_TOKEN", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    api_url = "https://api-inference.huggingface.co/models/facebook/mms-tts-fas"
+    payload = {"inputs": text}
+    
+    out_wav = Path(out_wav)
     delays = (2, 4, 8, 12, 16)
     for attempt, delay in enumerate(delays, start=1):
-        tmp_mp3 = out_mp3.with_name(out_mp3.stem + ".partial" + out_mp3.suffix)
         try:
-            tmp_mp3.unlink(missing_ok=True)
-            await edge_tts.Communicate(text, VOICE, rate=RATE).save(str(tmp_mp3))
-            if not tmp_mp3.exists() or tmp_mp3.stat().st_size < 1024:
-                raise RuntimeError("Empty audio output")
-            tmp_mp3.replace(out_mp3)
-            return
+            response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+            if response.status_code == 200 and len(response.content) > 1024:
+                out_wav.write_bytes(response.content)
+                return
+            else:
+                print(f"HF TTS attempt {attempt} returned status {response.status_code}")
         except Exception as e:
-            tmp_mp3.unlink(missing_ok=True)
-            if attempt < len(delays):
-                await asyncio.sleep(delay)
-    raise RuntimeError(f"TTS failed for text: {text}")
+            print(f"HF TTS attempt {attempt} failed: {e}")
+        if attempt < len(delays):
+            await asyncio.sleep(delay)
+            
+    raise RuntimeError(f"Hugging Face TTS failed after multiple attempts for text: {text}")
 
 
 def run(cmd):
@@ -222,10 +223,10 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
         wavs.append(lead_wav)
         t += lead
     for j, ch in enumerate(chunks):
-        mp3 = d / f"a{idx:02d}_{j:02d}.mp3"
+        raw_audio = d / f"a{idx:02d}_{j:02d}_raw.wav"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
-        await tts(speak_text(ch), mp3)
-        to_wav(mp3, wav, tail if j == len(chunks) - 1 else GAP)
+        await tts(ch, raw_audio)
+        to_wav(raw_audio, wav, tail if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
         timing.append((ch, t, t + dur))
         wavs.append(wav)
@@ -320,9 +321,8 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts (Eye-Friendly Matte Dark Theme)
+# ---------------------------------------------------------------- HTML Layouts (Matte Dark Theme)
 def bg_html(image_path, idx, total, title):
-    """Calm, eye-friendly matte dark background with soft lighting for comfortable viewing."""
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
@@ -331,18 +331,8 @@ def bg_html(image_path, idx, total, title):
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
         f"  background: radial-gradient(circle at 50% 40%, rgba(30,30,42,0.6) 0%, rgba(11,11,14,0.98) 75%);"
         f"}}"
-        f".ambient-glow {{"
-        f"  position: absolute; width: 120%; height: 120%; top: -10%; left: -10%;"
-        f"  background: radial-gradient(circle at 80% 20%, rgba(255,210,31,0.03) 0%, transparent 40%);"
-        f"  animation: pulseGlow 8s ease-in-out infinite alternate;"
-        f"}}"
-        f"@keyframes pulseGlow {{"
-        f"  0% {{ opacity: 0.6; transform: scale(1); }}"
-        f"  100% {{ opacity: 1; transform: scale(1.05); }}"
-        f"}}"
         f"</style></head><body>"
         f"<div class='bg-matte'></div>"
-        f"<div class='ambient-glow'></div>"
         f"</body></html>"
     )
 
