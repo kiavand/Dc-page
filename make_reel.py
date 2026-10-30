@@ -25,6 +25,7 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import urllib.error
 import json
 import os
 from pathlib import Path
@@ -277,7 +278,7 @@ def fetch_image(prompt, path, seed):
 
 # ---------------------------------------------------------------- speech
 async def tts(text, out_mp3):
-    """Generate MP3 with ElevenLabs or Edge TTS, validating output before use."""
+    """Generate audio with ElevenLabs; automatically fall back to Edge TTS."""
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text; refusing to create a silent/invalid audio file.")
@@ -286,61 +287,37 @@ async def tts(text, out_mp3):
     tmp_mp3 = out_mp3.with_name(out_mp3.stem + ".partial" + out_mp3.suffix)
     tmp_mp3.unlink(missing_ok=True)
 
+    if TTS_PROVIDER not in ("elevenlabs", "edge"):
+        raise ValueError(f"Unsupported TTS_PROVIDER={TTS_PROVIDER!r}. Use 'elevenlabs' or 'edge'.")
+
     if TTS_PROVIDER == "elevenlabs":
         api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
         voice_id = ELEVENLABS_VOICE_ID
         if not api_key:
-            raise RuntimeError(
-                "TTS_PROVIDER is 'elevenlabs' but ELEVENLABS_API_KEY is missing. "
-                "Add it to GitHub Actions repository secrets."
-            )
-        if not voice_id:
-            raise RuntimeError("ELEVENLABS_VOICE_ID is empty.")
-
-        url = (
-            "https://api.elevenlabs.io/v1/text-to-speech/"
-            + urllib.parse.quote(voice_id, safe="")
-            + "?output_format=mp3_44100_128"
-        )
-        payload = {
-            "text": text,
-            "model_id": ELEVENLABS_MODEL_ID,
-            "voice_settings": {
-                "stability": 0.45,
-                "similarity_boost": 0.75
-            }
-        }
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "xi-api-key": api_key,
-                "Content-Type": "application/json",
-                "Accept": "audio/mpeg",
-                "User-Agent": UA,
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=90) as response:
-                audio = response.read()
-            if len(audio) < 1024 or not audio.startswith(b"ID3") and not audio.startswith(b"\xff\xfb") and not audio.startswith(b"\xff\xf3") and not audio.startswith(b"\xff\xf2"):
-                # Some valid MP3 streams start with an MPEG frame other than the common headers.
+            print("ELEVENLABS_API_KEY is missing; falling back to Edge TTS.")
+        elif not voice_id:
+            print("ELEVENLABS_VOICE_ID is empty; falling back to Edge TTS.")
+        else:
+            url = ("https://api.elevenlabs.io/v1/text-to-speech/" + urllib.parse.quote(voice_id, safe="") + "?output_format=mp3_44100_128")
+            payload = {"text": text, "model_id": ELEVENLABS_MODEL_ID, "voice_settings": {"stability": 0.45, "similarity_boost": 0.75}}
+            req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers={"xi-api-key": api_key, "Content-Type": "application/json", "Accept": "audio/mpeg", "User-Agent": UA}, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=90) as response:
+                    audio = response.read()
                 if len(audio) < 1024:
                     raise RuntimeError("ElevenLabs returned an empty or unusually small audio response.")
-            tmp_mp3.write_bytes(audio)
-            tmp_mp3.replace(out_mp3)
-            return
-        except Exception as e:
-            tmp_mp3.unlink(missing_ok=True)
-            raise RuntimeError(
-                f"ElevenLabs TTS failed for {len(text)} characters using voice {voice_id!r}: "
-                f"{type(e).__name__}: {e}"
-            ) from e
+                tmp_mp3.write_bytes(audio)
+                tmp_mp3.replace(out_mp3)
+                return
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", "replace")
+                print(f"ElevenLabs HTTP {e.code} for {len(text)} characters; falling back to Edge TTS. Response: {body[:800]}")
+                tmp_mp3.unlink(missing_ok=True)
+            except Exception as e:
+                print(f"ElevenLabs failed ({type(e).__name__}: {e}); falling back to Edge TTS.")
+                tmp_mp3.unlink(missing_ok=True)
 
-    if TTS_PROVIDER != "edge":
-        raise ValueError(f"Unsupported TTS_PROVIDER={TTS_PROVIDER!r}. Use 'elevenlabs' or 'edge'.")
-
+    # Edge TTS is the fallback for ElevenLabs errors, including HTTP 402.
     import edge_tts
     last = None
     delays = (2, 4, 8, 12, 16)
@@ -349,10 +326,7 @@ async def tts(text, out_mp3):
             tmp_mp3.unlink(missing_ok=True)
             await edge_tts.Communicate(text, VOICE, rate=RATE).save(str(tmp_mp3))
             if not tmp_mp3.exists() or tmp_mp3.stat().st_size < 1024:
-                raise RuntimeError(
-                    f"Edge TTS returned no usable audio (attempt {attempt}/{len(delays)}, "
-                    f"text length={len(text)} characters)."
-                )
+                raise RuntimeError(f"Edge TTS returned no usable audio (attempt {attempt}/{len(delays)}, text length={len(text)} characters).")
             tmp_mp3.replace(out_mp3)
             return
         except Exception as e:
@@ -361,10 +335,7 @@ async def tts(text, out_mp3):
             print(f"Edge TTS attempt {attempt}/{len(delays)} failed; text length={len(text)}; error={type(e).__name__}: {e}")
             if attempt < len(delays):
                 await asyncio.sleep(delay)
-    raise RuntimeError(
-        f"Edge TTS failed after {len(delays)} attempts for {len(text)} characters. "
-        f"Last error: {type(last).__name__}: {last}"
-    ) from last
+    raise RuntimeError(f"Edge TTS failed after {len(delays)} attempts for {len(text)} characters. Last error: {type(last).__name__}: {last}") from last
 
 
 def run(cmd):
