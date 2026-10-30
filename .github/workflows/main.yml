@@ -75,4 +75,5 @@ jobs:
             exit 0
           fi
           git commit -m "Save Telegram polling state and reel queue"
+          git pull --rebase origin main || git pull --rebase
           git push
