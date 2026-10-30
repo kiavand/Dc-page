@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from make_reg import norm, strip_marks if False else __import__('make_reel', fromlist=['norm', 'strip_marks'])
 from make_reel import norm, strip_marks
 
 
@@ -128,10 +129,11 @@ def llm(system, user, temperature=0.3):
         "model": "openai", "temperature": temperature,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }).encode()
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
     for url in ("https://text.pollinations.ai/openai", "https://gen.pollinations.ai/v1/chat/completions"):
         try:
             req = urllib.request.Request(url, data=payload, headers={
-                "Content-Type": "application/json", "User-Agent": UA})
+                "Content-Type": "application/json", "User-Agent": ua})
             with urllib.request.urlopen(req, timeout=75) as response:
                 data = json.loads(response.read().decode("utf-8"))
             result = (data["choices"][0]["message"]["content"] or "").strip()
@@ -195,7 +197,6 @@ def improve(text):
     draft = clean_script(llm(EDITOR_PROMPT, "متن نویسنده:\n" + text, 0.35))
     if not draft or not valid_script(draft) or not digits(draft).issubset(digits(text)):
         return None
-    # Reject obvious AI summaries: edited narration must retain at least 85% of source words.
     source_words = len(re.findall(r"\S+", text))
     draft_words = len(re.findall(r"\S+", draft))
     if source_words >= 25 and draft_words < source_words * 0.85:
@@ -303,7 +304,6 @@ def poll():
         message = update.get("message") or {}
         if str(message.get("chat", {}).get("id")) != CHAT_ID:
             continue
-        # Ignore messages sent by bots and non-text messages.
         if message.get("from", {}).get("is_bot") or not message.get("text"):
             continue
         jobs += on_text(message, update["update_id"])
@@ -325,17 +325,6 @@ def shrink_if_needed(path):
     if result.returncode == 0 and small.exists() and small.stat().st_size <= MAX_TG_BYTES:
         return small
     return path
-
-
-def mascot_report(log):
-    found = re.search(r"^MASCOT: found=(.*)$", log, re.M)
-    used = re.search(r"^MASCOT: used=(.*)$", log, re.M)
-    if not found or found.group(1).strip() == "none":
-        return "🦁 فایل تصویر شیر پیدا نشد؛ اگر به شیر نیاز داری، فایل‌های تصویر را در پوشه mascot قرار بده."
-    report = "🦁 فایل‌های شیر پیدا شده: " + found.group(1).strip()
-    if used and used.group(1).strip() != "none":
-        report += "\nحالت‌های استفاده‌شده: " + used.group(1).strip()
-    return report
 
 
 def send_results(job, video, log):
@@ -368,15 +357,12 @@ def build():
             if result.returncode != 0 or not out.exists() or out.stat().st_size == 0:
                 tail = "\n".join(log.strip().splitlines()[-15:])
                 say("❌ ساخت ویدیو خطا داد.\n" + run_url() + "\n\n" + tail[-1200:])
-                # Keep the job in the queue; the next scheduled run can retry it.
                 continue
             if send_results(job, out, log):
                 job.unlink(missing_ok=True)
-            # Retain failed uploads in the queue for the next scheduled retry.
         except Exception as exc:
             print("BUILD_ERROR:", type(exc).__name__, str(exc)[:500])
             say("❌ هنگام ساخت یا ارسال ویدیو خطا رخ داد.\n" + run_url())
-            # Keep the job file in work/ so a later workflow run can retry it.
 
 
 if __name__ == "__main__":
