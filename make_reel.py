@@ -1,12 +1,12 @@
 """
-Persian Reel builder v3.5 (Hugging Face TTS Integration & Matte Dark Theme).
+Persian Reel builder v3.6 (Edge-TTS Integration & Matte Dark Theme).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a comfortable matte dark aesthetic with Hugging Face AI voice.
+Backgrounds feature a comfortable matte dark aesthetic with Edge-TTS voice.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -23,7 +23,7 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
-import requests
+import edge_tts
 from pathlib import Path
 
 W, H, FPS = 1080, 1920, 30
@@ -37,6 +37,7 @@ PAGE_HANDLE = ""                 # no handle is displayed inside the video
 MASCOT_DIR = Path(__file__).resolve().parent / "mascot"   
 XFADE = 0.5                      # crossfade between scenes (s)
 MUSIC_VOLUME = 0.12
+VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 COVER_TAG = "آقای استمرار | Mr.Continuity"
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
@@ -156,34 +157,14 @@ def split_chunks(text, max_chars=72):
     return merged
 
 
-# ---------------------------------------------------------------- Hugging Face TTS
+# ---------------------------------------------------------------- Edge-TTS
 async def tts(text, out_wav):
-    """Generate Persian speech using Hugging Face Inference API (facebook/mms-tts-fas)."""
+    """Generate Persian speech using Edge-TTS."""
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
-    
-    token = os.environ.get("HF_TOKEN", "")
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
-    api_url = "https://api-inference.huggingface.co/models/facebook/mms-tts-fas"
-    payload = {"inputs": text}
-    
-    out_wav = Path(out_wav)
-    delays = (2, 4, 8, 12, 16)
-    for attempt, delay in enumerate(delays, start=1):
-        try:
-            response = requests.post(api_url, headers=headers, json=payload, timeout=60)
-            if response.status_code == 200 and len(response.content) > 1024:
-                out_wav.write_bytes(response.content)
-                return
-            else:
-                print(f"HF TTS attempt {attempt} returned status {response.status_code}")
-        except Exception as e:
-            print(f"HF TTS attempt {attempt} failed: {e}")
-        if attempt < len(delays):
-            await asyncio.sleep(delay)
-            
-    raise RuntimeError(f"Hugging Face TTS failed after multiple attempts for text: {text}")
+    communicate = edge_tts.Communicate(text, VOICE)
+    await communicate.save(str(out_wav))
 
 
 def run(cmd):
