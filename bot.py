@@ -16,7 +16,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reg import norm, strip_marks if False else __import__('make_reel', fromlist=['norm', 'strip_marks'])
 from make_reel import norm, strip_marks
 
 
