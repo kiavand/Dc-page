@@ -39,13 +39,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install requests
 
       - name: Verify configuration
         run: |
           test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Missing TELEGRAM_BOT_TOKEN"; exit 1; }
           test -n "$TELEGRAM_CHAT_ID" || { echo "::error::Missing TELEGRAM_CHAT_ID"; exit 1; }
-          test -n "$HF_TOKEN" || { echo "::error::Missing HF_TOKEN"; exit 1; }
+          test -n "$HF_TOKEN" || { echo "::error::Missing HF_TOKEN"; exit 1;[span_0](start_span)[span_0](end_span) }
 
       - name: Poll Telegram messages
         id: poll
@@ -59,7 +58,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Build and send reels
-        if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt'] != ''
+        if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
         run: python bot.py build
 
       - name: Save polling state and pending jobs
