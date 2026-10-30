@@ -1,12 +1,12 @@
 """
-Persian Reel builder v3.3 (Optimized Outro & Extended Smart Icons).
+Persian Reel builder v3.4 (Eye-Friendly Matte Dark Theme & Smart Icons).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature dynamic dark animated gradient with extended smart vector icons.
+Backgrounds feature a comfortable matte dark aesthetic with high-contrast text cards.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -294,7 +294,7 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' "
-            f"style='filter:drop-shadow(0 0 20px rgba(255,210,31,.4));'>"
+            f"style='filter:drop-shadow(0 0 16px rgba(255,210,31,.35));'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
 
@@ -320,23 +320,29 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts
+# ---------------------------------------------------------------- HTML Layouts (Eye-Friendly Matte Dark Theme)
 def bg_html(image_path, idx, total, title):
+    """Calm, eye-friendly matte dark background with soft lighting for comfortable viewing."""
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
-        f".bg-animated {{"
-        f"  position: absolute; width: 180%; height: 180%; top: -40%; left: -40%;"
-        f"  background: radial-gradient(circle, rgba(255,210,31,0.25) 0%, rgba(26,0,51,0.95) 70%);"
-        f"  animation: pulseBg 4s ease-in-out infinite alternate;"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
+        f".bg-matte {{"
+        f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
+        f"  background: radial-gradient(circle at 50% 40%, rgba(30,30,42,0.6) 0%, rgba(11,11,14,0.98) 75%);"
         f"}}"
-        f"@keyframes pulseBg {{"
-        f"  0% {{ transform: scale(1); }}"
-        f"  100% {{ transform: scale(1.15); }}"
+        f".ambient-glow {{"
+        f"  position: absolute; width: 120%; height: 120%; top: -10%; left: -10%;"
+        f"  background: radial-gradient(circle at 80% 20%, rgba(255,210,31,0.03) 0%, transparent 40%);"
+        f"  animation: pulseGlow 8s ease-in-out infinite alternate;"
+        f"}}"
+        f"@keyframes pulseGlow {{"
+        f"  0% {{ opacity: 0.6; transform: scale(1); }}"
+        f"  100% {{ opacity: 1; transform: scale(1.05); }}"
         f"}}"
         f"</style></head><body>"
-        f"<div class='bg-animated'></div>"
+        f"<div class='bg-matte'></div>"
+        f"<div class='ambient-glow'></div>"
         f"</body></html>"
     )
 
@@ -370,11 +376,11 @@ def sub_html(text, icon_override=None):
         f".sub-icon{{position:absolute;left:0;right:0;top:730px;display:flex;justify-content:center;"
         f"align-items:center;animation: popIcon 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);}}"
         f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
-        f".b{{max-width:920px;background:rgba(15,5,30,0.92);color:#fff;font-family:{FONT};"
+        f".b{{max-width:920px;background:rgba(18,18,24,0.94);color:#f3f4f6;font-family:{FONT};"
         f"font-weight:800;font-size:{size}px;line-height:1.65;padding:26px 38px;"
-        f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.14);"
-        f"box-shadow: 0 10px 30px rgba(0,0,0,0.8);}}"
-        f".kw{{color:{YELLOW};text-shadow:0 0 14px rgba(255,210,31,.4)}}"
+        f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.08);"
+        f"box-shadow: 0 16px 40px rgba(0,0,0,0.6);}}"
+        f".kw{{color:{YELLOW};text-shadow:0 0 16px rgba(255,210,31,.35)}}"
         f".brand{{position:absolute;left:0;right:0;top:1500px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};font-size:38px;font-weight:800;text-shadow:0 0 20px rgba(255,210,31,.25)}}"
         f"@keyframes popIcon {{ 0% {{ transform: scale(0.8); opacity: 0; }} 100% {{ transform: scale(1); opacity: 1; }} }}"
@@ -392,12 +398,12 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".icon{{margin-bottom:36px;display:flex;align-items:center;justify-content:center}}"
         f".word{{color:{YELLOW};font-weight:800;font-size:120px;line-height:1.35;max-width:950px;"
-        f"text-shadow: 0 0 35px rgba(255,210,31,0.3);}}"
+        f"text-shadow: 0 0 35px rgba(255,210,31,0.25);}}"
         f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:39px;font-weight:800;color:#fff}}"
         f"</style></head><body>"
         f"<div class='icon'>{icon}</div>"
@@ -412,13 +418,13 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#0b0b0e}}"
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
-        f"justify-content:center;gap:32px}}"
-        f".slogan{{font-size:72px;font-weight:800;line-height:1.4;color:{YELLOW};"
-        f"white-space:nowrap;text-shadow:0 0 30px rgba(255,210,31,.3)}}"
-        f".brand{{font-size:44px;font-weight:800;color:#fff;line-height:1.5}}"
+        f"justify-content:center;gap:28px}}"
+        f".slogan{{font-size:66px;font-weight:800;line-height:1.4;color:{YELLOW};"
+        f"white-space:nowrap;text-shadow:0 0 30px rgba(255,210,31,.25)}}"
+        f".brand{{font-size:42px;font-weight:800;color:#f3f4f6;line-height:1.5}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -549,7 +555,7 @@ async def build(hook, scenes, d, dst, tag=None):
             jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
             recent_icon_kinds.append(chosen_kind)
-            recent_icon_kinds = recent_icon_kinds[-2:] # keep window smaller to allow higher variety rotation
+            recent_icon_kinds = recent_icon_kinds[-2:]
         sub_pngs.append(row)
         
     outro_png = d / "outro.png"
