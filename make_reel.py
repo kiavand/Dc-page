@@ -1,12 +1,12 @@
 """
-Persian Reel builder v3.1 (Modern Dynamic Dark Theme).
+Persian Reel builder v3.2 (Visual Debug & Dynamic Dark Theme).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
                                    (the "عنوان ::" part is optional)
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature dynamic dark animated mesh with topic-matched inline vector icons.
+Backgrounds feature dynamic dark animated gradient with topic-matched inline vector icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -306,23 +306,21 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts (Dynamic Dark Theme)
+# ---------------------------------------------------------------- HTML Layouts (Visible Debug & Dynamic Dark Theme)
 def bg_html(image_path, idx, total, title):
-    """Dynamic Dark Background with smoothly animated mesh gradients."""
+    """Debug & Dynamic Background with a clear visible purple-dark pulse gradient to confirm updates."""
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#030303}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
         f".bg-animated {{"
         f"  position: absolute; width: 180%; height: 180%; top: -40%; left: -40%;"
-        f"  background: radial-gradient(circle at 50% 50%, rgba(255,210,31,0.07) 0%, rgba(5,5,5,0.98) 55%),"
-        f"              radial-gradient(circle at 20% 25%, rgba(253,224,71,0.04) 0%, transparent 45%),"
-        f"              radial-gradient(circle at 80% 75%, rgba(255,210,31,0.03) 0%, transparent 45%);"
-        f"  animation: rotateBg 24s linear infinite;"
+        f"  background: radial-gradient(circle, rgba(255,210,31,0.25) 0%, rgba(26,0,51,0.95) 70%);"
+        f"  animation: pulseBg 4s ease-in-out infinite alternate;"
         f"}}"
-        f"@keyframes rotateBg {{"
-        f"  0% {{ transform: rotate(0deg); }}"
-        f"  100% {{ transform: rotate(360deg); }}"
+        f"@keyframes pulseBg {{"
+        f"  0% {{ transform: scale(1); }}"
+        f"  100% {{ transform: scale(1.15); }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='bg-animated'></div>"
@@ -359,7 +357,7 @@ def sub_html(text, icon_override=None):
         f".sub-icon{{position:absolute;left:0;right:0;top:730px;display:flex;justify-content:center;"
         f"align-items:center;animation: popIcon 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);}}"
         f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
-        f".b{{max-width:920px;background:rgba(8,8,8,0.92);color:#fff;font-family:{FONT};"
+        f".b{{max-width:920px;background:rgba(15,5,30,0.92);color:#fff;font-family:{FONT};"
         f"font-weight:800;font-size:{size}px;line-height:1.65;padding:26px 38px;"
         f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.14);"
         f"box-shadow: 0 10px 30px rgba(0,0,0,0.8);}}"
@@ -381,7 +379,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#030303}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".icon{{margin-bottom:36px;display:flex;align-items:center;justify-content:center}}"
@@ -401,7 +399,7 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#030303}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#1a0033}}"
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:940px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:42px}}"
