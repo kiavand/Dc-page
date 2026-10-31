@@ -1,11 +1,11 @@
 """
-Persian Reel builder v4.2 (Cinematic Matte Dark & Dynamic Realistic Icon Animations).
+Persian Reel builder v4.3 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a high-end cinematic matte dark aesthetic with specific realistic icon motion graphics.
+Backgrounds feature high-end cinematic matte dark aesthetics with pixel-perfect optical alignment.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -225,7 +225,7 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
-def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
+def icon_svg(text, color="#FFD21F", size=260, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
         "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/>",
@@ -247,8 +247,8 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
     }
     path_data = paths.get(kind, paths["target"])
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
-            f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
-            f"stroke-linejoin='round' class='animated-svg icon-{kind}'>"
+            f"fill='none' stroke='{color}' stroke-width='5' stroke-linecap='round' "
+            f"stroke-linejoin='round' class='animated-svg'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
 
@@ -274,7 +274,7 @@ def cover_word(hook):
     return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
-# ---------------------------------------------------------------- HTML Layouts (Cinematic Matte Dark)
+# ---------------------------------------------------------------- HTML Layouts (Ultra-Professional Alignment)
 def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
@@ -299,7 +299,7 @@ def bg_html(image_path, idx, total, title):
 def sub_html(text, icon_override=None):
     text = strip_marks(text)
     n = len(text)
-    size = 64 if n < 30 else 58 if n < 48 else 52 if n < 62 else 48
+    size = 62 if n < 30 else 56 if n < 48 else 50 if n < 62 else 46
 
     keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "درآمد", "تلاش",
                       "تیم", "رهبری", "اعتماد", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت", "انعطاف"]
@@ -317,60 +317,29 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    kind = icon_override or icon_kind(text)
-    icon = icon_svg(text, YELLOW, 260, kind)
+    icon = icon_svg(text, YELLOW, 240, icon_override)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:710px;display:flex;justify-content:center;"
+        f".sub-icon{{position:absolute;left:0;right:0;top:690px;height:260px;display:flex;justify-content:center;"
         f"align-items:center;}}"
-        f".animated-svg {{ filter: drop-shadow(0 0 22px rgba(255,210,31,0.5)); }}"
-        
-        # Realistic Motion Graphic Animations for each Icon
-        f".icon-bulb {{ animation: bulbFlicker 1.8s ease-in-out infinite alternate; }}"
-        f".icon-book {{ animation: bookFlip 2.2s ease-in-out infinite alternate; transform-origin: center; }}"
-        f".icon-compass {{ animation: compassSpin 4s linear infinite; transform-origin: center; }}"
-        f".icon-brain {{ animation: brainPulse 2s ease-in-out infinite alternate; }}"
-        f".icon-time {{ animation: timeTick 2s cubic-bezier(0.4, 0, 0.2, 1) infinite; transform-origin: center; }}"
-        f".icon-target {{ animation: targetZoom 2s ease-in-out infinite alternate; transform-origin: center; }}"
-        f".icon-money {{ animation: moneyFloat 2.4s ease-in-out infinite alternate; }}"
-        f".icon-growth {{ animation: growthRise 1.9s ease-in-out infinite alternate; }}"
-        f".icon-trophy {{ animation: trophyBounce 2s ease-in-out infinite alternate; }}"
-        f".icon-shield {{ animation: shieldProtect 2.2s ease-in-out infinite alternate; }}"
-        f".icon-people {{ animation: peopleWave 2.5s ease-in-out infinite alternate; }}"
-        f".icon-question {{ animation: questionSwing 2s ease-in-out infinite alternate; transform-origin: top center; }}"
-        f".icon-zap {{ animation: zapFlash 1.2s steps(2, start) infinite; }}"
-        f".icon-calendar {{ animation: calendarPulse 2s ease-in-out infinite alternate; }}"
-        f".icon-sliders {{ animation: slidersMove 2.2s ease-in-out infinite alternate; }}"
-        f".icon-heart {{ animation: heartBeat 1.4s ease-in-out infinite; transform-origin: center; }}"
-
-        # Animation Keyframes
-        f"@keyframes bulbFlicker {{ 0%, 100% {{ opacity: 1; filter: drop-shadow(0 0 30px rgba(255,210,31,0.9)); }} 50% {{ opacity: 0.4; filter: drop-shadow(0 0 8px rgba(255,210,31,0.2)); }} }}"
-        f"@keyframes bookFlip {{ 0% {{ transform: scaleX(1); }} 50% {{ transform: scaleX(0.4) rotate(-3deg); }} 100% {{ transform: scaleX(1); }} }}"
-        f"@keyframes compassSpin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}"
-        f"@keyframes brainPulse {{ 0% {{ transform: scale(0.92); opacity: 0.8; }} 100% {{ transform: scale(1.08); opacity: 1; }} }}"
-        f"@keyframes timeTick {{ 0% {{ transform: rotate(0deg); }} 25% {{ transform: rotate(15deg); }} 50% {{ transform: rotate(0deg); }} 75% {{ transform: rotate(-15deg); }} 100% {{ transform: rotate(0deg); }} }}"
-        f"@keyframes targetZoom {{ 0% {{ transform: scale(0.85); }} 100% {{ transform: scale(1.12); }} }}"
-        f"@keyframes moneyFloat {{ 0% {{ transform: translateY(0px); }} 100% {{ transform: translateY(-25px); }} }}"
-        f"@keyframes growthRise {{ 0% {{ transform: translateY(15px) scale(0.9); }} 100% {{ transform: translateY(-15px) scale(1.08); }} }}"
-        f"@keyframes trophyBounce {{ 0% {{ transform: translateY(0) scale(1); }} 100% {{ transform: translateY(-12px) scale(1.06); }} }}"
-        f"@keyframes shieldProtect {{ 0% {{ transform: scale(0.95); opacity: 0.85; }} 100% {{ transform: scale(1.05); opacity: 1; }} }}"
-        f"@keyframes peopleWave {{ 0% {{ transform: translateX(-10px); }} 100% {{ transform: translateX(10px); }} }}"
-        f"@keyframes questionSwing {{ 0% {{ transform: rotate(-12deg); }} 100% {{ transform: rotate(12deg); }} }}"
-        f"@keyframes zapFlash {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.3; transform: scale(0.9); }} }}"
-        f"@keyframes calendarPulse {{ 0% {{ transform: scale(0.96); }} 100% {{ transform: scale(1.04); }} }}"
-        f"@keyframes slidersMove {{ 0% {{ transform: translateY(-5px); }} 100% {{ transform: translateY(5px); }} }}"
-        f"@keyframes heartBeat {{ 0% {{ transform: scale(1); }} 14% {{ transform: scale(1.15); }} 28% {{ transform: scale(1); }} 42% {{ transform: scale(1.15); }} 70% {{ transform: scale(1); }} }}"
-
-        f".w{{position:absolute;left:50px;right:50px;top:1010px;display:flex;justify-content:center}}"
-        f".b{{max-width:940px;background:rgba(14,14,20,0.95);color:#f3f4f6;font-family:{FONT};"
-        f"font-weight:800;font-size:{size}px;line-height:1.65;padding:28px 40px;"
-        f"border-radius:30px;text-align:center;border:2px solid rgba(255,210,31,0.15);"
-        f"box-shadow: 0 20px 50px rgba(0,0,0,0.75);}}"
-        f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
-        f".brand{{position:absolute;left:0;right:0;top:1520px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};font-size:36px;font-weight:800;opacity:0.9;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
+        f".animated-svg {{"
+        f"  animation: softPulse 2.4s ease-in-out infinite alternate;"
+        f"  filter: drop-shadow(0 0 18px rgba(255,210,31,0.45));"
+        f"}}"
+        f".w{{position:absolute;left:70px;right:70px;top:990px;display:flex;justify-content:center}}"
+        f".b{{width:100%;max-width:940px;background:rgba(14,14,20,0.96);color:#f3f4f6;font-family:{FONT};"
+        f"font-weight:800;font-size:{size}px;line-height:1.7;padding:32px 44px;"
+        f"border-radius:32px;text-align:center;border:1.5px solid rgba(255,210,31,0.18);"
+        f"box-shadow: 0 24px 55px rgba(0,0,0,0.8);}}"
+        f".kw{{color:{YELLOW};text-shadow:0 0 18px rgba(255,210,31,0.45)}}"
+        f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
+        f"font-family:{FONT};font-size:35px;font-weight:800;letter-spacing:-0.5px;opacity:0.92;text-shadow:0 0 18px rgba(255,210,31,0.25)}}"
+        f"@keyframes softPulse {{"
+        f"  0% {{ transform: scale(0.94); opacity: 0.85; }}"
+        f"  100% {{ transform: scale(1.04); opacity: 1; }}"
+        f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
@@ -381,22 +350,23 @@ def sub_html(text, icon_override=None):
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
     word = cover_word(hook)
-    kind = icon_kind(word)
-    icon = icon_svg(word, YELLOW, 340, kind)
+    icon = icon_svg(word, YELLOW, 320)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
-        f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
-        f".icon{{margin-bottom:40px;display:flex;align-items:center;justify-content:center;z-index:2}}"
-        f".animated-svg {{ filter: drop-shadow(0 0 25px rgba(255,210,31,0.55)); }}"
-        f".icon-{kind} {{ animation: coverMotion 2.2s ease-in-out infinite alternate; }}"
-        f"@keyframes coverMotion {{ 0% {{ transform: scale(0.9); }} 100% {{ transform: scale(1.08); }} }}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:125px;line-height:1.35;max-width:960px;"
-        f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
-        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;color:#fff;z-index:2}}"
+        f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.07) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
+        f".icon{{margin-bottom:45px;display:flex;align-items:center;justify-content:center;z-index:2;height:320px}}"
+        f".animated-svg {{ animation: coverPulse 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 0 25px rgba(255,210,31,0.5)); }}"
+        f".word{{color:{YELLOW};font-weight:800;font-size:120px;line-height:1.3;max-width:960px;"
+        f"text-shadow: 0 0 40px rgba(255,210,31,0.3);z-index:2}}"
+        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:36px;font-weight:800;letter-spacing:-0.5px;color:#fff;z-index:2;opacity:0.95}}"
+        f"@keyframes coverPulse {{"
+        f"  0% {{ transform: scale(0.92); }}"
+        f"  100% {{ transform: scale(1.05); }}"
+        f"}}"
         f"</style></head><body>"
         f"<div class='bg-glow'></div>"
         f"<div class='icon'>{icon}</div>"
@@ -415,9 +385,9 @@ def outro_html(mascot=False):
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
-        f".slogan{{font-size:68px;font-weight:800;line-height:1.4;color:{YELLOW};"
-        f"white-space:nowrap;text-shadow:0 0 35px rgba(255,210,31,0.35)}}"
-        f".brand{{font-size:42px;font-weight:800;color:#f3f4f6;line-height:1.5}}"
+        f".slogan{{font-size:66px;font-weight:800;line-height:1.4;color:{YELLOW};"
+        f"white-space:nowrap;text-shadow:0 0 32px rgba(255,210,31,0.35)}}"
+        f".brand{{font-size:40px;font-weight:800;color:#f3f4f6;line-height:1.5;letter-spacing:-0.5px}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
