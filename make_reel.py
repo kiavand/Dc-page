@@ -1,11 +1,11 @@
 """
-Persian Reel builder v4.1 (Cinematic Matte Dark & Animated Icons).
+Persian Reel builder v4.2 (Cinematic Matte Dark & Dynamic Realistic Icon Animations).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a high-end cinematic matte dark aesthetic with animated dynamic icons.
+Backgrounds feature a high-end cinematic matte dark aesthetic with specific realistic icon motion graphics.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -197,7 +197,7 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- smart animated icons
+# ---------------------------------------------------------------- smart icons mapping
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
@@ -248,7 +248,7 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
     path_data = paths.get(kind, paths["target"])
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
-            f"stroke-linejoin='round' class='animated-svg'>"
+            f"stroke-linejoin='round' class='animated-svg icon-{kind}'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
 
@@ -317,17 +317,52 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    icon = icon_svg(text, YELLOW, 260, icon_override)
+    kind = icon_override or icon_kind(text)
+    icon = icon_svg(text, YELLOW, 260, kind)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f".sub-icon{{position:absolute;left:0;right:0;top:710px;display:flex;justify-content:center;"
         f"align-items:center;}}"
-        f".animated-svg {{"
-        f"  animation: popAndPulse 1.8s ease-in-out infinite alternate;"
-        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
-        f"}}"
+        f".animated-svg {{ filter: drop-shadow(0 0 22px rgba(255,210,31,0.5)); }}"
+        
+        # Realistic Motion Graphic Animations for each Icon
+        f".icon-bulb {{ animation: bulbFlicker 1.8s ease-in-out infinite alternate; }}"
+        f".icon-book {{ animation: bookFlip 2.2s ease-in-out infinite alternate; transform-origin: center; }}"
+        f".icon-compass {{ animation: compassSpin 4s linear infinite; transform-origin: center; }}"
+        f".icon-brain {{ animation: brainPulse 2s ease-in-out infinite alternate; }}"
+        f".icon-time {{ animation: timeTick 2s cubic-bezier(0.4, 0, 0.2, 1) infinite; transform-origin: center; }}"
+        f".icon-target {{ animation: targetZoom 2s ease-in-out infinite alternate; transform-origin: center; }}"
+        f".icon-money {{ animation: moneyFloat 2.4s ease-in-out infinite alternate; }}"
+        f".icon-growth {{ animation: growthRise 1.9s ease-in-out infinite alternate; }}"
+        f".icon-trophy {{ animation: trophyBounce 2s ease-in-out infinite alternate; }}"
+        f".icon-shield {{ animation: shieldProtect 2.2s ease-in-out infinite alternate; }}"
+        f".icon-people {{ animation: peopleWave 2.5s ease-in-out infinite alternate; }}"
+        f".icon-question {{ animation: questionSwing 2s ease-in-out infinite alternate; transform-origin: top center; }}"
+        f".icon-zap {{ animation: zapFlash 1.2s steps(2, start) infinite; }}"
+        f".icon-calendar {{ animation: calendarPulse 2s ease-in-out infinite alternate; }}"
+        f".icon-sliders {{ animation: slidersMove 2.2s ease-in-out infinite alternate; }}"
+        f".icon-heart {{ animation: heartBeat 1.4s ease-in-out infinite; transform-origin: center; }}"
+
+        # Animation Keyframes
+        f"@keyframes bulbFlicker {{ 0%, 100% {{ opacity: 1; filter: drop-shadow(0 0 30px rgba(255,210,31,0.9)); }} 50% {{ opacity: 0.4; filter: drop-shadow(0 0 8px rgba(255,210,31,0.2)); }} }}"
+        f"@keyframes bookFlip {{ 0% {{ transform: scaleX(1); }} 50% {{ transform: scaleX(0.4) rotate(-3deg); }} 100% {{ transform: scaleX(1); }} }}"
+        f"@keyframes compassSpin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}"
+        f"@keyframes brainPulse {{ 0% {{ transform: scale(0.92); opacity: 0.8; }} 100% {{ transform: scale(1.08); opacity: 1; }} }}"
+        f"@keyframes timeTick {{ 0% {{ transform: rotate(0deg); }} 25% {{ transform: rotate(15deg); }} 50% {{ transform: rotate(0deg); }} 75% {{ transform: rotate(-15deg); }} 100% {{ transform: rotate(0deg); }} }}"
+        f"@keyframes targetZoom {{ 0% {{ transform: scale(0.85); }} 100% {{ transform: scale(1.12); }} }}"
+        f"@keyframes moneyFloat {{ 0% {{ transform: translateY(0px); }} 100% {{ transform: translateY(-25px); }} }}"
+        f"@keyframes growthRise {{ 0% {{ transform: translateY(15px) scale(0.9); }} 100% {{ transform: translateY(-15px) scale(1.08); }} }}"
+        f"@keyframes trophyBounce {{ 0% {{ transform: translateY(0) scale(1); }} 100% {{ transform: translateY(-12px) scale(1.06); }} }}"
+        f"@keyframes shieldProtect {{ 0% {{ transform: scale(0.95); opacity: 0.85; }} 100% {{ transform: scale(1.05); opacity: 1; }} }}"
+        f"@keyframes peopleWave {{ 0% {{ transform: translateX(-10px); }} 100% {{ transform: translateX(10px); }} }}"
+        f"@keyframes questionSwing {{ 0% {{ transform: rotate(-12deg); }} 100% {{ transform: rotate(12deg); }} }}"
+        f"@keyframes zapFlash {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.3; transform: scale(0.9); }} }}"
+        f"@keyframes calendarPulse {{ 0% {{ transform: scale(0.96); }} 100% {{ transform: scale(1.04); }} }}"
+        f"@keyframes slidersMove {{ 0% {{ transform: translateY(-5px); }} 100% {{ transform: translateY(5px); }} }}"
+        f"@keyframes heartBeat {{ 0% {{ transform: scale(1); }} 14% {{ transform: scale(1.15); }} 28% {{ transform: scale(1); }} 42% {{ transform: scale(1.15); }} 70% {{ transform: scale(1); }} }}"
+
         f".w{{position:absolute;left:50px;right:50px;top:1010px;display:flex;justify-content:center}}"
         f".b{{max-width:940px;background:rgba(14,14,20,0.95);color:#f3f4f6;font-family:{FONT};"
         f"font-weight:800;font-size:{size}px;line-height:1.65;padding:28px 40px;"
@@ -336,13 +371,6 @@ def sub_html(text, icon_override=None):
         f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
         f".brand{{position:absolute;left:0;right:0;top:1520px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};font-size:36px;font-weight:800;opacity:0.9;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
-        f"@keyframes popAndPulse {{"
-        f"  0% {{ transform: scale(0.8); opacity: 0; }}"
-        f"  20% {{ transform: scale(1.05); opacity: 1; }}"
-        f"  50% {{ transform: scale(0.97); }}"
-        f"  80% {{ transform: scale(1.03); }}"
-        f"  100% {{ transform: scale(1); opacity: 1; }}"
-        f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
@@ -353,7 +381,8 @@ def sub_html(text, icon_override=None):
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
     word = cover_word(hook)
-    icon = icon_svg(word, YELLOW, 340)
+    kind = icon_kind(word)
+    icon = icon_svg(word, YELLOW, 340, kind)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
@@ -362,15 +391,12 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
         f".icon{{margin-bottom:40px;display:flex;align-items:center;justify-content:center;z-index:2}}"
-        f".animated-svg {{ animation: popAndPulse 1.8s ease-in-out infinite alternate; filter: drop-shadow(0 0 25px rgba(255,210,31,0.55)); }}"
+        f".animated-svg {{ filter: drop-shadow(0 0 25px rgba(255,210,31,0.55)); }}"
+        f".icon-{kind} {{ animation: coverMotion 2.2s ease-in-out infinite alternate; }}"
+        f"@keyframes coverMotion {{ 0% {{ transform: scale(0.9); }} 100% {{ transform: scale(1.08); }} }}"
         f".word{{color:{YELLOW};font-weight:800;font-size:125px;line-height:1.35;max-width:960px;"
         f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
         f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;color:#fff;z-index:2}}"
-        f"@keyframes popAndPulse {{"
-        f"  0% {{ transform: scale(0.85); }}"
-        f"  50% {{ transform: scale(1.05); }}"
-        f"  100% {{ transform: scale(1); }}"
-        f"}}"
         f"</style></head><body>"
         f"<div class='bg-glow'></div>"
         f"<div class='icon'>{icon}</div>"
