@@ -1,11 +1,11 @@
 """
-Persian Reel builder v4.0 (Ultimate Cinematic Matte Dark & Smart Icons).
+Persian Reel builder v4.1 (Cinematic Matte Dark & Animated Icons).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature a high-end cinematic matte dark aesthetic with dynamic icons.
+Backgrounds feature a high-end cinematic matte dark aesthetic with animated dynamic icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -197,7 +197,7 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- smart icons
+# ---------------------------------------------------------------- smart animated icons
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
@@ -248,8 +248,7 @@ def icon_svg(text, color="#FFD21F", size=300, kind_override=None):
     path_data = paths.get(kind, paths["target"])
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
-            f"stroke-linejoin='round' "
-            f"style='filter:drop-shadow(0 0 20px rgba(255,210,31,0.45));'>"
+            f"stroke-linejoin='round' class='animated-svg'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
 
@@ -324,7 +323,11 @@ def sub_html(text, icon_override=None):
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f".sub-icon{{position:absolute;left:0;right:0;top:710px;display:flex;justify-content:center;"
-        f"align-items:center;animation: popIcon 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);}}"
+        f"align-items:center;}}"
+        f".animated-svg {{"
+        f"  animation: popAndPulse 1.8s ease-in-out infinite alternate;"
+        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
+        f"}}"
         f".w{{position:absolute;left:50px;right:50px;top:1010px;display:flex;justify-content:center}}"
         f".b{{max-width:940px;background:rgba(14,14,20,0.95);color:#f3f4f6;font-family:{FONT};"
         f"font-weight:800;font-size:{size}px;line-height:1.65;padding:28px 40px;"
@@ -333,7 +336,13 @@ def sub_html(text, icon_override=None):
         f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
         f".brand{{position:absolute;left:0;right:0;top:1520px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};font-size:36px;font-weight:800;opacity:0.9;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
-        f"@keyframes popIcon {{ 0% {{ transform: scale(0.7); opacity: 0; }} 100% {{ transform: scale(1); opacity: 1; }} }}"
+        f"@keyframes popAndPulse {{"
+        f"  0% {{ transform: scale(0.8); opacity: 0; }}"
+        f"  20% {{ transform: scale(1.05); opacity: 1; }}"
+        f"  50% {{ transform: scale(0.97); }}"
+        f"  80% {{ transform: scale(1.03); }}"
+        f"  100% {{ transform: scale(1); opacity: 1; }}"
+        f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
@@ -353,9 +362,15 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
         f".icon{{margin-bottom:40px;display:flex;align-items:center;justify-content:center;z-index:2}}"
+        f".animated-svg {{ animation: popAndPulse 1.8s ease-in-out infinite alternate; filter: drop-shadow(0 0 25px rgba(255,210,31,0.55)); }}"
         f".word{{color:{YELLOW};font-weight:800;font-size:125px;line-height:1.35;max-width:960px;"
         f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
         f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;color:#fff;z-index:2}}"
+        f"@keyframes popAndPulse {{"
+        f"  0% {{ transform: scale(0.85); }}"
+        f"  50% {{ transform: scale(1.05); }}"
+        f"  100% {{ transform: scale(1); }}"
+        f"}}"
         f"</style></head><body>"
         f"<div class='bg-glow'></div>"
         f"<div class='icon'>{icon}</div>"
