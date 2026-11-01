@@ -232,37 +232,6 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
-
-# ---------------------------------------------------------------- semantic emoji system
-# Select one expressive emoji from the actual sentence; deterministic and context-aware.
-def choose_emoji(text):
-    t = norm(text).lower()
-    rules = [
-        (("😂", ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),),
-    ]
-    # Emotion and conversational intent take priority over generic topic icons.
-    groups = [
-        (("😂", "🤣", "😅"), ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),
-        (("😳", "🤯", "😮"), ("باور نکردنی", "تعجب", "شگفت", "غافلگیر", "عجیب", "تصور نمی")),
-        (("😔", "🥺", "😢"), ("غم", "ناراحت", "شکست", "تنهایی", "ناامید", "دلسرد", "حسرت")),
-        (("😡", "🤦", "😤"), ("اشتباه", "عصبان", "اشتباهات", "گند", "خراب", "بهانه")),
-        (("🤔", "🧐", "😕"), ("چرا", "چگونه", "چطور", "سوال", "سؤال", "شک", "فکر کن", "تردید")),
-        (("🏆", "🥳", "😍"), ("موفق", "پیروزی", "برنده", "دستاورد", "افتخار", "نتیجه گرفت")),
-        (("💪", "🔥", "🚀"), ("تلاش", "پشتکار", "انگیزه", "قدرت", "شروع", "حرکت", "استمرار")),
-        (("🧠", "💡", "📚"), ("ذهن", "یادگیری", "آموزش", "دانش", "ایده", "مهارت", "تصمیم")),
-        (("💰", "📈", "💎"), ("پول", "درآمد", "ثروت", "سرمایه", "مالی", "فروش")),
-        (("🤝", "👥", "🫂"), ("تیم", "همکاری", "رهبری", "اعتماد", "ارتباط", "استقلال")),
-        (("⏳", "🗓️", "⌛"), ("زمان", "برنامه", "عادت", "فرصت", "امروز", "فردا")),
-        (("⚠️", "🚨", "❌"), ("خطر", "هشدار", "مراقب", "نباید", "ممنوع", "ریسک")),
-        (("❤️", "🫶", "😊"), ("عشق", "احترام", "خانواده", "رابطه", "مهربان", "حمایت")),
-    ]
-    for emojis, words in groups:
-        if any(norm(w) in t for w in words):
-            # Choose a stable variant from sentence content, avoiding random visual noise.
-            idx = int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:4], 16) % len(emojis)
-            return emojis[idx]
-    return "✨"
-
 def icon_svg(text, color="#FFD21F", size=320, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
@@ -361,14 +330,18 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    emoji = choose_emoji(text)
+    icon = icon_svg(text, YELLOW, 300, icon_override)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:650px;height:320px;display:flex;justify-content:center;align-items:center;}}"
-        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:230px;line-height:1;filter:drop-shadow(0 12px 24px rgba(255,210,31,.24));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:660px;height:300px;display:flex;justify-content:center;"
+        f"align-items:center;}}"
+        f".animated-svg {{"
+        f"  animation: softPulse 2.4s ease-in-out infinite alternate;"
+        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
+        f"}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
         f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
@@ -383,39 +356,66 @@ def sub_html(text, icon_override=None):
         f"  100% {{ transform: scale(1.05); opacity: 1; }}"
         f"}}"
         f"</style></head><body>"
-        f"<div class='sub-icon'><span class='emoji'>{emoji}</span></div>"
+        f"<div class='sub-icon'>{icon}</div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
         f"</body></html>"
     )
 
 
+def brand_logo_svg(size=112):
+    """Original Mr.Continuity emblem: an unbroken golden path forming an ascending M."""
+    return (
+        f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' role='img' aria-label='Mr Continuity logo'>"
+        "<defs><linearGradient id='gold' x1='0' y1='0' x2='1' y2='1'>"
+        "<stop offset='0' stop-color='#FFF0A6'/><stop offset='.48' stop-color='#FFD21F'/><stop offset='1' stop-color='#B77A08'/></linearGradient>"
+        "<filter id='glow'><feGaussianBlur stdDeviation='2.4' result='b'/><feMerge><feMergeNode in='b'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>"
+        "<path d='M60 7a53 53 0 1 0 53 53' fill='none' stroke='url(#gold)' stroke-width='2.2' opacity='.55'/>"
+        "<path d='M25 82V37l24 28 11-14 11 14 24-28v45' fill='none' stroke='url(#gold)' stroke-width='7' stroke-linecap='round' stroke-linejoin='round' filter='url(#glow)'/>"
+        "<path d='M60 65v23' stroke='#FFF0A6' stroke-width='3' stroke-linecap='round'/><circle cx='60' cy='96' r='4' fill='#FFD21F'/>"
+        "</svg>"
+    )
+
+
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
+    """Premium editorial cover: fixed original brand emblem + topic-specific vector artwork."""
     word = cover_word(hook)
-    emoji = choose_emoji(hook + " " + word)
+    icon = icon_svg(hook, YELLOW, 390)
+    logo = brand_logo_svg(104)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
-        f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;display:flex;flex-direction:column;"
-        f"align-items:center;justify-content:center;text-align:center;position:relative}}"
-        f".bg-glow{{position:absolute;width:850px;height:850px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
-        f".icon{{margin-bottom:50px;display:flex;align-items:center;justify-content:center;z-index:2;height:380px}}"
-        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:300px;line-height:1;filter:drop-shadow(0 14px 30px rgba(255,210,31,.28));animation:coverPulse 2.8s ease-in-out infinite alternate;}}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:124px;line-height:1.42;max-width:940px;"
-        f"padding:0 28px;box-sizing:border-box;letter-spacing:0;direction:rtl;text-wrap:balance;"
-        f"text-shadow:0 0 36px rgba(255,210,31,0.28);z-index:2}}"
-        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-family:{FONT};{FONT_RENDERING}font-size:36px;font-weight:700;letter-spacing:0;color:#fff;z-index:2;opacity:0.96}}"
-        f"@keyframes coverPulse {{"
-        f"  0% {{ transform: scale(0.92); }}"
-        f"  100% {{ transform: scale(1.06); }}"
-        f"}}"
-        f"</style></head><body>"
-        f"<div class='bg-glow'></div>"
-        f"<div class='icon'><span class='emoji'>{emoji}</span></div>"
-        f"<div class='word'>{html.escape(word)}</div>"
-        f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
-        f"</body></html>"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#070707}}"
+        f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
+        f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
+        f".grain{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 43%,rgba(255,210,31,.13),transparent 47%),"
+        f"linear-gradient(145deg,rgba(255,255,255,.035),transparent 35%,rgba(255,210,31,.025));pointer-events:none}}"
+        f".top{{position:absolute;top:112px;left:90px;right:90px;display:flex;align-items:center;gap:22px;z-index:3;"
+        f"padding:22px 28px;border:1px solid rgba(255,210,31,.28);border-radius:24px;"
+        f"background:linear-gradient(110deg,rgba(255,255,255,.07),rgba(255,255,255,.015));backdrop-filter:blur(12px)}}"
+        f".logo{{width:104px;height:104px;display:flex;align-items:center;justify-content:center}}"
+        f".brandtext{{text-align:right;display:flex;flex-direction:column;gap:3px}}"
+        f".brandfa{{font-size:38px;font-weight:800;color:#fff;line-height:1.45}}"
+        f".branden{{font-family:Arial,sans-serif;font-size:18px;letter-spacing:4px;color:#D8B65A;direction:ltr;text-align:right}}"
+        f".tag{{margin-right:auto;border:1px solid rgba(255,210,31,.4);border-radius:30px;padding:12px 20px;"
+        f"font-size:22px;color:#FFD21F;background:rgba(255,210,31,.07);white-space:nowrap}}"
+        f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
+        f"margin-top:95px;position:relative}}"
+        f".visual:before{{content:'';position:absolute;width:460px;height:460px;border-radius:50%;"
+        f"border:1px solid rgba(255,210,31,.18);box-shadow:0 0 75px rgba(255,210,31,.08),inset 0 0 55px rgba(255,210,31,.045)}}"
+        f".animated-svg{{filter:drop-shadow(0 0 26px rgba(255,210,31,.32));animation:float 4s ease-in-out infinite}}"
+        f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:116px;line-height:1.42;max-width:900px;"
+        f"padding:0 42px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.17);margin-top:8px}}"
+        f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:26px}}"
+        f".footer{{position:absolute;bottom:150px;left:0;right:0;color:#A9A9A9;font-size:23px;letter-spacing:.3px;z-index:2}}"
+        f".footer b{{color:#E7C66B;font-weight:700}}"
+        f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
+        f"</style></head><body><div class='grain'></div>"
+        f"<div class='top'><div class='logo'>{logo}</div><div class='brandtext'>"
+        f"<div class='brandfa'>آقای استمرار</div><div class='branden'>MR. CONTINUITY</div></div>"
+        f"<div class='tag'>نکته‌ی امروز</div></div>"
+        f"<div class='visual'>{icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
+        f"<div class='footer'>هر روز، <b>یک قدم</b> به جلو</div></body></html>"
     )
 
 
