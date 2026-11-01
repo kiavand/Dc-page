@@ -36,7 +36,9 @@ MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
-BACKGROUND = "#050508"  # واحد رنگ پس‌زمینه برای کاور، صحنه‌ها و پایان ویدئو
+BACKGROUND = "#07080D"  # پایه‌ی یکسان برای کاور، صحنه‌ها و پایان ویدئو
+# دو سایه‌ی سینمایی بسیار ملایم؛ بدون تغییر ناگهانی رنگ بین کاور و بدنه
+BACKGROUND_CSS = "radial-gradient(ellipse at 18% 22%, rgba(22,38,58,.72) 0%, rgba(22,38,58,0) 48%), radial-gradient(ellipse at 82% 78%, rgba(62,37,24,.48) 0%, rgba(62,37,24,0) 52%), #07080D"
 YELLOW = "#FFD21F"
 
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -324,10 +326,10 @@ def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
         f".bg-cinematic {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: {BACKGROUND};"
+        f"  background: {BACKGROUND_CSS};"
         f"}}"
         f".glow-orb {{"
         f"  position: absolute; width: 650px; height: 650px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
@@ -406,13 +408,13 @@ def brand_logo_svg(size=112):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
-    """Clean cinematic cover matching reel background; expressive semantic emoji, no top banner."""
+    """Icon-only cover matching the reel background; body scenes continue using smart emojis."""
     word = cover_word(hook)
-    emoji = choose_emoji(hook + " " + word)
+    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=330)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
         f".grain{{position:absolute;inset:0;background:transparent;pointer-events:none}}"
@@ -420,8 +422,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"margin-top:-55px;position:relative}}"
         f".visual:before{{content:'';position:absolute;width:460px;height:460px;border-radius:50%;"
         f"border:1px solid rgba(255,210,31,.14);box-shadow:0 0 65px rgba(255,210,31,.055),inset 0 0 48px rgba(255,210,31,.035)}}"
-        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:300px;line-height:1;"
-        f"filter:drop-shadow(0 14px 30px rgba(255,210,31,.28));animation:float 4s ease-in-out infinite}}"
+        f".cover-icon{{width:330px;height:330px;filter:drop-shadow(0 14px 30px rgba(255,210,31,.25));animation:float 4s ease-in-out infinite}}"
         f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
         f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.16);margin-top:-4px}}"
         f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:25px}}"
@@ -429,7 +430,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px rgba(255,210,31,.22);z-index:2}}"
         f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
         f"</style></head><body><div class='grain'></div>"
-        f"<div class='visual'><span class='emoji'>{emoji}</span></div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
+        f"<div class='visual'>{cover_icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>"
     )
 
@@ -439,7 +440,7 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
