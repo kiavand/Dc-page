@@ -1,5 +1,4 @@
-"""
-Persian Reel builder v4.3 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
+"""Persian Reel builder v4.3 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
@@ -197,57 +196,69 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- smart icons mapping
+# ---------------------------------------------------------------- smart icons mapping (High-End Vector Precision)
 def icon_kind(text):
     t = norm(text).lower()
     rules = [
-        (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری"), "brain"),
+        (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری", "آرامش خیال"), "brain"),
         (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "اقتصاد"), "money"),
-        (("هدف", "موفقیت", "مسیر", "شروع", "نتیجه", "اولویت"), "target"),
-        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود"), "growth"),
+        (("هدف", "موفقیت", "مسیر", "شروع", "نتیجه", "اولویت", "قفل گشودن", "درها"), "target"),
+        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود", "افق", "رشد فردی"), "growth"),
         (("کتاب", "آموزش", "دانش", "مطالعه", "مهارت"), "book"),
-        (("عشق", "رابطه", "اعتماد", "ارتباط"), "heart"),
-        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "انضباط"), "time"),
+        (("عشق", "رابطه", "اعتماد", "ارتباط", "قلب", "جان"), "heart"),
+        (("زمان", "استمرار", "تداوم", "عادت", "صبر", "پشتکار", "تلاش", "انضباط", "هر روز"), "time"),
         (("سؤال", "سوال", "چرا", "چطور", "چگونه", "مشکل"), "question"),
-        (("تیم", "رهبری", "همکاری", "گروه", "استقلال", "انعطاف"), "people"),
+        (("تیم", "رهبری", "همکاری", "گروه", "استقلال", "انعطاف", "انسان"), "people"),
         (("ایده", "خلاقیت", "الهام", "راهکار"), "bulb"),
         (("مسئولیت", "تعهد", "پذیرش"), "shield"),
         (("قوانین", "اصول", "ساختار"), "sliders"),
         (("قدرت", "انرژی", "شتاب"), "zap"),
-        (("برنده", "جایزه", "افتخار"), "trophy"),
-        (("انتخاب", "جهت", "قطب‌نما"), "compass"),
+        (("برنده", "جایزه", "افتخار", "قله", "فتح"), "trophy"),
+        (("انتخاب", "جهت", "قطب‌نما", "قطب نمای"), "compass"),
         (("برنامه‌ریزی", "تقویم", "اسناد"), "calendar"),
+        (("موبایل", "تکنولوژی", "اپلیکیشن"), "mobile"),
+        (("صندلی", "مدیریت", "جایگاه"), "chair"),
+        (("مغازه", "فروشگاه", "بیزینس", "تجارت"), "shop"),
+        (("سکه", "ارزش", "پاداش"), "coin"),
+        (("درخت", "ریشه", "پایداری"), "tree"),
+        (("خواب", "استراحت", "ریکاوری", "ماه"), "sleep"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
             return kind
-    choices = ("target", "brain", "growth", "time", "bulb", "compass", "trophy", "shield")
+    choices = ("target", "brain", "growth", "time", "bulb", "compass", "trophy", "shield", "compass")
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
-def icon_svg(text, color="#FFD21F", size=260, kind_override=None):
+def icon_svg(text, color="#FFD21F", size=320, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
-        "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/>",
-        "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
-        "target": "<circle cx='60' cy='60' r='42'/><circle cx='60' cy='60' r='27'/><circle cx='60' cy='60' r='11'/><path d='M60 60 99 21M83 21h16v16'/>",
-        "growth": "<path d='M18 100V20M18 100h86'/><path d='m28 82 23-24 17 12 31-39'/><path d='M81 31h18v18'/>",
-        "book": "<path d='M15 25c20-7 34-2 45 8v61C49 83 34 79 15 86Z'/><path d='M105 25c-20-7-34-2-45 8v61c11-11 26-15 45-8Z'/>",
-        "heart": "<path d='M60 99 20 61C-3 36 28 9 49 29l11 11 11-11c21-20 52 7 29 32Z'/>",
-        "time": "<circle cx='60' cy='60' r='42'/><path d='M60 34v28l20 13'/>",
-        "question": "<path d='M38 42c2-27 42-31 48-6 4 18-22 21-25 39'/><circle cx='60' cy='91' r='3'/>",
-        "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12'/>",
-        "bulb": "<path d='M42 76c-3-9-16-17-16-34a34 34 0 1 1 68 0c0 17-13 25-16 34Z'/><path d='M45 88h30M49 99h22M47 76h26'/>",
-        "shield": "<path d='M60 10l40 15v29c0 27-17 43-40 56C37 97 20 81 20 54V25Z'/>",
-        "sliders": "<path d='M18 32h84M18 60h84M18 88h84M40 24v16M70 52v16M50 80v16'/>",
-        "zap": "<path d='M68 8L25 66h28l-5 46 47-65H65Z'/>",
-        "trophy": "<path d='M36 14h48v26c0 21-10 32-24 32S36 61 36 40Z'/><path d='M36 25H17v13c0 15 10 22 23 22M84 25h19v13c0 15-10 22-23 22'/>",
-        "compass": "<circle cx='60' cy='60' r='46'/><path d='m76 34-10 32-32 20 10-32Z'/>",
-        "calendar": "<rect x='18' y='25' width='84' height='78' rx='8'/><path d='M18 44h84M39 15v20M81 15v20'/>",
+        "compass": "<circle cx='60' cy='60' r='46' stroke-width='4'/><path d='m76 34-10 32-32 20 10-32Z' fill='rgba(255,210,31,0.12)'/><circle cx='60' cy='60' r='6' fill='#FFD21F'/>",
+        "brain": "<path d='M48 18c-14-13-33-2-31 14-14 9-10 29 3 33-5 16 9 29 24 22 5 11 19 10 21-2V20c0-11-10-11-17-2Z'/><path d='M72 18c14-13 33-2 31 14 14 9 10 29-3 33 5 16-9 29-24 22-5 11-19 10-21-2V20c0-11 10-11 17-2Z'/><path d='M60 22v76' stroke-dasharray='3 3'/>",
+        "growth": "<path d='M16 104V16M16 104h88'/><path d='m26 84 24-26 18 13 30-42' stroke-width='6'/><path d='M78 29h20v20'/><circle cx='98' cy='29' r='4' fill='#FFD21F'/>",
+        "target": "<circle cx='60' cy='60' r='44' stroke-width='4'/><circle cx='60' cy='60' r='28' stroke-width='4'/><circle cx='60' cy='60' r='12' fill='rgba(255,210,31,0.2)'/><path d='M60 60 102 18'/><path d='M84 18h18v18'/>",
+        "trophy": "<path d='M34 16h52v26c0 22-11 34-26 34S34 64 34 42Z'/><path d='M34 26H14v12c0 16 11 24 24 24M86 26h20v12c0 16-11 24-24 24'/><path d='M60 76v18M46 94h28' stroke-width='6'/>",
+        "money": "<rect x='16' y='28' width='88' height='64' rx='10' stroke-width='4'/><circle cx='60' cy='60' r='16' stroke-width='4'/><path d='M26 40h8M86 80h8'/>",
+        "coin": "<ellipse cx='60' cy='60' rx='40' ry='44' stroke-width='5'/><path d='M60 30v60M46 44h28M46 76h28'/><circle cx='60' cy='60' r='30' fill='rgba(255,210,31,0.08)'/>",
+        "book": "<path d='M14 26c22-8 36-2 46 8v62C50 86 36 80 14 88Z'/><path d='M106 26c-22-8-36-2-46 8v62c22-6 36-2 46-8Z'/><path d='M60 34v62'/>",
+        "heart": "<path d='M60 102 18 60C-4 35 26 8 48 28l12 12 12-12c22-20 52 7 30 32Z' fill='rgba(255,210,31,0.1)'/>",
+        "time": "<circle cx='60' cy='60' r='44' stroke-width='4'/><path d='M60 32v28l22 14'/><circle cx='60' cy='60' r='5' fill='#FFD21F'/>",
+        "people": "<circle cx='60' cy='28' r='12'/><circle cx='28' cy='42' r='9'/><circle cx='92' cy='42' r='9'/><path d='M36 96V82c0-14 11-25 24-25s24 11 24 25v14'/>",
+        "bulb": "<path d='M40 74c-3-9-15-17-15-32a35 35 0 1 1 70 0c0 15-12 23-15 32Z'/><path d='M44 86h32M48 96h24M46 74h28' stroke-width='4'/>",
+        "shield": "<path d='M60 10l42 16v30c0 28-18 45-42 58C36 101 18 84 18 56V26Z'/>",
+        "mobile": "<rect x='32' y='14' width='56' height='92' rx='10' stroke-width='4'/><path d='M54 24h12M52 100h16' stroke-width='5'/><circle cx='60' cy='88' r='3' fill='#FFD21F'/>",
+        "chair": "<path d='M36 34h48v30H36Z'/><path d='M42 64v32M78 64v32M30 46h60M46 34V18h28v16' stroke-width='4'/>",
+        "shop": "<path d='M18 46h84v50H18Z'/><path d='M14 46l10-24h72l10 24M44 64h32v32H44Z' stroke-width='4'/>",
+        "tree": "<path d='M60 14c-20 0-36 16-36 36 0 12 6 22 16 28v28h40V78c10-6 16-16 16-28 0-20-16-36-36-36Z'/><path d='M52 106h16' stroke-width='6'/>",
+        "sleep": "<path d='M76 22a36 36 0 1 1-42 42c4-18 20-30 42-42Z' fill='rgba(255,210,31,0.1)'/><path d='M82 34l12 12M94 34L82 46' stroke-width='3'/>",
+        "question": "<path d='M38 40c2-26 42-30 48-6 4 18-22 21-25 38'/><circle cx='60' cy='90' r='4' fill='#FFD21F'/>",
+        "sliders": "<path d='M16 30h88M16 60h88M16 90h88M38 20v20M72 50v20M48 80v20' stroke-width='4'/>",
+        "zap": "<path d='M68 6L24 64h30l-6 50 50-62H68Z' fill='rgba(255,210,31,0.15)'/>",
+        "calendar": "<rect x='18' y='24' width='84' height='80' rx='8' stroke-width='4'/><path d='M18 46h84M38 14v20M82 14v20'/>"
     }
     path_data = paths.get(kind, paths["target"])
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
-            f"fill='none' stroke='{color}' stroke-width='5' stroke-linecap='round' "
+            f"fill='none' stroke='{color}' stroke-width='4.5' stroke-linecap='round' "
             f"stroke-linejoin='round' class='animated-svg'>"
             f"<g transform='translate(0 -1)'>{path_data}</g></svg>")
 
@@ -285,8 +296,8 @@ def bg_html(image_path, idx, total, title):
         f"  background: radial-gradient(circle at 50% 35%, rgba(35,35,55,0.7) 0%, rgba(8,8,12,0.99) 80%);"
         f"}}"
         f".glow-orb {{"
-        f"  position: absolute; width: 600px; height: 600px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
-        f"  background: radial-gradient(circle, rgba(255,210,31,0.06) 0%, rgba(0,0,0,0) 70%);"
+        f"  position: absolute; width: 650px; height: 650px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
+        f"  background: radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);"
         f"  border-radius: 50%; pointer-events: none;"
         f"}}"
         f"</style></head><body>"
@@ -317,28 +328,28 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    icon = icon_svg(text, YELLOW, 240, icon_override)
+    icon = icon_svg(text, YELLOW, 300, icon_override)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:690px;height:260px;display:flex;justify-content:center;"
+        f".sub-icon{{position:absolute;left:0;right:0;top:660px;height:300px;display:flex;justify-content:center;"
         f"align-items:center;}}"
         f".animated-svg {{"
         f"  animation: softPulse 2.4s ease-in-out infinite alternate;"
-        f"  filter: drop-shadow(0 0 18px rgba(255,210,31,0.45));"
+        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
         f"}}"
-        f".w{{position:absolute;left:70px;right:70px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:940px;background:rgba(14,14,20,0.96);color:#f3f4f6;font-family:{FONT};"
-        f"font-weight:800;font-size:{size}px;line-height:1.7;padding:32px 44px;"
-        f"border-radius:32px;text-align:center;border:1.5px solid rgba(255,210,31,0.18);"
-        f"box-shadow: 0 24px 55px rgba(0,0,0,0.8);}}"
-        f".kw{{color:{YELLOW};text-shadow:0 0 18px rgba(255,210,31,0.45)}}"
+        f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
+        f".b{{width:100%;max-width:960px;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
+        f"font-weight:800;font-size:{size}px;line-height:1.75;padding:36px 48px;"
+        f"border-radius:36px;text-align:center;border:1.8px solid rgba(255,210,31,0.22);"
+        f"box-shadow: 0 28px 60px rgba(0,0,0,0.85);}}"
+        f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};font-size:35px;font-weight:800;letter-spacing:-0.5px;opacity:0.92;text-shadow:0 0 18px rgba(255,210,31,0.25)}}"
+        f"font-family:{FONT};font-size:36px;font-weight:800;letter-spacing:-0.5px;opacity:0.94;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
         f"@keyframes softPulse {{"
-        f"  0% {{ transform: scale(0.94); opacity: 0.85; }}"
-        f"  100% {{ transform: scale(1.04); opacity: 1; }}"
+        f"  0% {{ transform: scale(0.93); opacity: 0.85; }}"
+        f"  100% {{ transform: scale(1.05); opacity: 1; }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
@@ -350,22 +361,22 @@ def sub_html(text, icon_override=None):
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
     word = cover_word(hook)
-    icon = icon_svg(word, YELLOW, 320)
+    icon = icon_svg(word, YELLOW, 380)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
         f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
-        f".bg-glow{{position:absolute;width:800px;height:800px;background:radial-gradient(circle, rgba(255,210,31,0.07) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
-        f".icon{{margin-bottom:45px;display:flex;align-items:center;justify-content:center;z-index:2;height:320px}}"
-        f".animated-svg {{ animation: coverPulse 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 0 25px rgba(255,210,31,0.5)); }}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:120px;line-height:1.3;max-width:960px;"
-        f"text-shadow: 0 0 40px rgba(255,210,31,0.3);z-index:2}}"
-        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:36px;font-weight:800;letter-spacing:-0.5px;color:#fff;z-index:2;opacity:0.95}}"
+        f".bg-glow{{position:absolute;width:850px;height:850px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
+        f".icon{{margin-bottom:50px;display:flex;align-items:center;justify-content:center;z-index:2;height:380px}}"
+        f".animated-svg {{ animation: coverPulse 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 0 30px rgba(255,210,31,0.6)); }}"
+        f".word{{color:{YELLOW};font-weight:800;font-size:130px;line-height:1.3;max-width:980px;"
+        f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
+        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;letter-spacing:-0.5px;color:#fff;z-index:2;opacity:0.96}}"
         f"@keyframes coverPulse {{"
         f"  0% {{ transform: scale(0.92); }}"
-        f"  100% {{ transform: scale(1.05); }}"
+        f"  100% {{ transform: scale(1.06); }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='bg-glow'></div>"
@@ -385,9 +396,9 @@ def outro_html(mascot=False):
         f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
-        f".slogan{{font-size:66px;font-weight:800;line-height:1.4;color:{YELLOW};"
-        f"white-space:nowrap;text-shadow:0 0 32px rgba(255,210,31,0.35)}}"
-        f".brand{{font-size:40px;font-weight:800;color:#f3f4f6;line-height:1.5;letter-spacing:-0.5px}}"
+        f".slogan{{font-size:70px;font-weight:800;line-height:1.4;color:{YELLOW};"
+        f"white-space:nowrap;text-shadow:0 0 35px rgba(255,210,31,0.4)}}"
+        f".brand{{font-size:42px;font-weight:800;color:#f3f4f6;line-height:1.5;letter-spacing:-0.5px}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -503,7 +514,7 @@ async def build(hook, scenes, d, dst, tag=None):
         bg_pngs.append(bp)
         row = []
         recent_icon_kinds = []
-        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar")
+        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar", "mobile", "chair", "shop", "coin", "tree", "sleep")
         
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
