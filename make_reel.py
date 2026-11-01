@@ -38,9 +38,11 @@ VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 YELLOW = "#FFD21F"
 
-FONT_LINK = ('<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:'
-             'wght@500;800&display=swap" rel="stylesheet">')
+FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
+             '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+             '<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">')
 FONT = "'Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
+FONT_RENDERING = "font-kerning:normal;font-feature-settings:'kern' 1,'liga' 1,'calt' 1;font-synthesis:none;text-rendering:optimizeLegibility;"
 
 # ---------------------------------------------------------------- text
 MARKS = re.compile("[\u064B-\u065F\u0670\u0640\u06D6-\u06ED]")
@@ -234,7 +236,7 @@ def icon_svg(text, color="#FFD21F", size=320, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
         "compass": "<circle cx='60' cy='60' r='46' stroke-width='4'/><path d='m76 34-10 32-32 20 10-32Z' fill='rgba(255,210,31,0.12)'/><circle cx='60' cy='60' r='6' fill='#FFD21F'/>",
-        "brain": "<path d='M48 18c-14-13-33-2-31 14-14 9-10 29 3 33-5 16 9 29 24 22 5 11 19 10 21-2V20c0-11-10-11-17-2Z'/><path d='M72 18c14-13 33-2 31 14 14 9 10 29-3 33 5 16-9 29-24 22-5 11-19 10-21-2V20c0-11 10-11 17-2Z'/><path d='M60 22v76' stroke-dasharray='3 3'/>",
+        "brain": '<g><path d="M60 18 C49 10 35 14 30 25 C17 25 12 37 17 48 C8 59 15 73 25 77 C22 90 34 99 45 94 C50 103 57 99 60 94 Z"/><path d="M60 18 C71 10 85 14 90 25 C103 25 108 37 103 48 C112 59 105 73 95 77 C98 90 86 99 75 94 C70 103 63 99 60 94 Z"/><path d="M42 25 C34 32 38 39 45 42 M22 49 C32 47 38 53 37 62 M28 76 C39 69 46 75 45 86 M51 31 C46 39 51 45 55 49 M48 59 C42 66 48 73 55 75"/><path d="M78 25 C86 32 82 39 75 42 M98 49 C88 47 82 53 83 62 M92 76 C81 69 74 75 75 86 M69 31 C74 39 69 45 65 49 M72 59 C78 66 72 73 65 75"/><path d="M60 18 V94" stroke-width="3"/></g>',
         "growth": "<path d='M16 104V16M16 104h88'/><path d='m26 84 24-26 18 13 30-42' stroke-width='6'/><path d='M78 29h20v20'/><circle cx='98' cy='29' r='4' fill='#FFD21F'/>",
         "target": "<circle cx='60' cy='60' r='44' stroke-width='4'/><circle cx='60' cy='60' r='28' stroke-width='4'/><circle cx='60' cy='60' r='12' fill='rgba(255,210,31,0.2)'/><path d='M60 60 102 18'/><path d='M84 18h18v18'/>",
         "trophy": "<path d='M34 16h52v26c0 22-11 34-26 34S34 64 34 42Z'/><path d='M34 26H14v12c0 16 11 24 24 24M86 26h20v12c0 16-11 24-24 24'/><path d='M60 76v18M46 94h28' stroke-width='6'/>",
@@ -333,6 +335,7 @@ def sub_html(text, icon_override=None):
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
+        f"body{{font-family:{FONT};{FONT_RENDERING}}}"
         f".sub-icon{{position:absolute;left:0;right:0;top:660px;height:300px;display:flex;justify-content:center;"
         f"align-items:center;}}"
         f".animated-svg {{"
@@ -340,13 +343,14 @@ def sub_html(text, icon_override=None):
         f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
         f"}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:960px;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
-        f"font-weight:800;font-size:{size}px;line-height:1.75;padding:36px 48px;"
-        f"border-radius:36px;text-align:center;border:1.8px solid rgba(255,210,31,0.22);"
+        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
+        f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
+        f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
+        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.22);"
         f"box-shadow: 0 28px 60px rgba(0,0,0,0.85);}}"
-        f".kw{{color:{YELLOW};text-shadow:0 0 20px rgba(255,210,31,0.5)}}"
+        f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 14px rgba(255,210,31,0.28)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};font-size:36px;font-weight:800;letter-spacing:-0.5px;opacity:0.94;text-shadow:0 0 20px rgba(255,210,31,0.3)}}"
+        f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.94;text-shadow:0 0 16px rgba(255,210,31,0.24)}}"
         f"@keyframes softPulse {{"
         f"  0% {{ transform: scale(0.93); opacity: 0.85; }}"
         f"  100% {{ transform: scale(1.05); opacity: 1; }}"
@@ -366,14 +370,15 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
-        f"body{{font-family:{FONT};color:#fff;display:flex;flex-direction:column;"
+        f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;display:flex;flex-direction:column;"
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".bg-glow{{position:absolute;width:850px;height:850px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
         f".icon{{margin-bottom:50px;display:flex;align-items:center;justify-content:center;z-index:2;height:380px}}"
         f".animated-svg {{ animation: coverPulse 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 0 30px rgba(255,210,31,0.6)); }}"
-        f".word{{color:{YELLOW};font-weight:800;font-size:130px;line-height:1.3;max-width:980px;"
-        f"text-shadow: 0 0 45px rgba(255,210,31,0.35);z-index:2}}"
-        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-size:38px;font-weight:800;letter-spacing:-0.5px;color:#fff;z-index:2;opacity:0.96}}"
+        f".word{{color:{YELLOW};font-weight:800;font-size:124px;line-height:1.42;max-width:940px;"
+        f"padding:0 28px;box-sizing:border-box;letter-spacing:0;direction:rtl;text-wrap:balance;"
+        f"text-shadow:0 0 36px rgba(255,210,31,0.28);z-index:2}}"
+        f".brand{{position:absolute;bottom:165px;left:0;right:0;font-family:{FONT};{FONT_RENDERING}font-size:36px;font-weight:700;letter-spacing:0;color:#fff;z-index:2;opacity:0.96}}"
         f"@keyframes coverPulse {{"
         f"  0% {{ transform: scale(0.92); }}"
         f"  100% {{ transform: scale(1.06); }}"
@@ -393,12 +398,12 @@ def outro_html(mascot=False):
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
-        f"body{{font-family:{FONT};color:{YELLOW};display:flex;align-items:center;justify-content:center;"
+        f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
-        f".slogan{{font-size:70px;font-weight:800;line-height:1.4;color:{YELLOW};"
-        f"white-space:nowrap;text-shadow:0 0 35px rgba(255,210,31,0.4)}}"
-        f".brand{{font-size:42px;font-weight:800;color:#f3f4f6;line-height:1.5;letter-spacing:-0.5px}}"
+        f".slogan{{font-family:{FONT};{FONT_RENDERING}font-size:68px;font-weight:800;line-height:1.55;color:{YELLOW};"
+        f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 30px rgba(255,210,31,0.3)}}"
+        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:#f3f4f6;line-height:1.6;letter-spacing:0}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -513,21 +518,11 @@ async def build(hook, scenes, d, dst, tag=None):
         jobs.append((bg_html(None, sh["scene"], len(scenes), sh["title"] or " ".join(sh["chunks"])), bp, False))
         bg_pngs.append(bp)
         row = []
-        recent_icon_kinds = []
-        icon_kinds = ("brain", "money", "target", "growth", "book", "heart", "time", "question", "people", "bulb", "shield", "sliders", "zap", "trophy", "compass", "calendar", "mobile", "chair", "shop", "coin", "tree", "sleep")
-        
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
             chosen_kind = icon_kind(txt)
-            if chosen_kind in recent_icon_kinds:
-                seed = int(hashlib.sha256(norm(txt).encode("utf-8")).hexdigest()[:8], 16)
-                alternatives = [kind for kind in icon_kinds if kind not in recent_icon_kinds]
-                if alternatives:
-                    chosen_kind = alternatives[seed % len(alternatives)]
             jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
-            recent_icon_kinds.append(chosen_kind)
-            recent_icon_kinds = recent_icon_kinds[-2:]
         sub_pngs.append(row)
         
     outro_png = d / "outro.png"
