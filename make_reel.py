@@ -378,44 +378,32 @@ def brand_logo_svg(size=112):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
-    """Premium editorial cover: fixed original brand emblem + topic-specific vector artwork."""
+    """Clean cinematic cover matching the reel's dark background, with no top banner."""
     word = cover_word(hook)
     icon = icon_svg(hook, YELLOW, 390)
-    logo = brand_logo_svg(104)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#070707}}"
+        # Match the dark base used by the video/outro; keep the center subtly illuminated for contrast.
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
-        f".grain{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 43%,rgba(255,210,31,.13),transparent 47%),"
-        f"linear-gradient(145deg,rgba(255,255,255,.035),transparent 35%,rgba(255,210,31,.025));pointer-events:none}}"
-        f".top{{position:absolute;top:112px;left:90px;right:90px;display:flex;align-items:center;gap:22px;z-index:3;"
-        f"padding:22px 28px;border:1px solid rgba(255,210,31,.28);border-radius:24px;"
-        f"background:linear-gradient(110deg,rgba(255,255,255,.07),rgba(255,255,255,.015));backdrop-filter:blur(12px)}}"
-        f".logo{{width:104px;height:104px;display:flex;align-items:center;justify-content:center}}"
-        f".brandtext{{text-align:right;display:flex;flex-direction:column;gap:3px}}"
-        f".brandfa{{font-size:38px;font-weight:800;color:#fff;line-height:1.45}}"
-        f".branden{{font-family:Arial,sans-serif;font-size:18px;letter-spacing:4px;color:#D8B65A;direction:ltr;text-align:right}}"
-        f".tag{{margin-right:auto;border:1px solid rgba(255,210,31,.4);border-radius:30px;padding:12px 20px;"
-        f"font-size:22px;color:#FFD21F;background:rgba(255,210,31,.07);white-space:nowrap}}"
+        f".grain{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 43%,rgba(255,210,31,.085),transparent 48%),"
+        f"linear-gradient(145deg,rgba(255,255,255,.018),transparent 42%,rgba(255,210,31,.018));pointer-events:none}}"
         f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
-        f"margin-top:95px;position:relative}}"
+        f"margin-top:-55px;position:relative}}"
         f".visual:before{{content:'';position:absolute;width:460px;height:460px;border-radius:50%;"
-        f"border:1px solid rgba(255,210,31,.18);box-shadow:0 0 75px rgba(255,210,31,.08),inset 0 0 55px rgba(255,210,31,.045)}}"
-        f".animated-svg{{filter:drop-shadow(0 0 26px rgba(255,210,31,.32));animation:float 4s ease-in-out infinite}}"
-        f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:116px;line-height:1.42;max-width:900px;"
-        f"padding:0 42px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.17);margin-top:8px}}"
-        f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:26px}}"
-        f".footer{{position:absolute;bottom:150px;left:0;right:0;color:#A9A9A9;font-size:23px;letter-spacing:.3px;z-index:2}}"
-        f".footer b{{color:#E7C66B;font-weight:700}}"
+        f"border:1px solid rgba(255,210,31,.14);box-shadow:0 0 65px rgba(255,210,31,.055),inset 0 0 48px rgba(255,210,31,.035)}}"
+        f".animated-svg{{filter:drop-shadow(0 0 24px rgba(255,210,31,.28));animation:float 4s ease-in-out infinite}}"
+        f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
+        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.16);margin-top:-4px}}"
+        f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:25px}}"
+        f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{YELLOW};font-family:{FONT};{FONT_RENDERING}"
+        f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px rgba(255,210,31,.22);z-index:2}}"
         f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
         f"</style></head><body><div class='grain'></div>"
-        f"<div class='top'><div class='logo'>{logo}</div><div class='brandtext'>"
-        f"<div class='brandfa'>آقای استمرار</div><div class='branden'>MR. CONTINUITY</div></div>"
-        f"<div class='tag'>نکته‌ی امروز</div></div>"
         f"<div class='visual'>{icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
-        f"<div class='footer'>هر روز، <b>یک قدم</b> به جلو</div></body></html>"
+        f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>"
     )
 
 
