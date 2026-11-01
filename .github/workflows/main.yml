@@ -54,7 +54,7 @@ jobs:
         if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-noto-color-emoji
           python -m playwright install --with-deps chromium
 
       - name: Build and send reels
