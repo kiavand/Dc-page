@@ -232,6 +232,37 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
+
+# ---------------------------------------------------------------- semantic emoji system
+# Select one expressive emoji from the actual sentence; deterministic and context-aware.
+def choose_emoji(text):
+    t = norm(text).lower()
+    rules = [
+        (("😂", ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),),
+    ]
+    # Emotion and conversational intent take priority over generic topic icons.
+    groups = [
+        (("😂", "🤣", "😅"), ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),
+        (("😳", "🤯", "😮"), ("باور نکردنی", "تعجب", "شگفت", "غافلگیر", "عجیب", "تصور نمی")),
+        (("😔", "🥺", "😢"), ("غم", "ناراحت", "شکست", "تنهایی", "ناامید", "دلسرد", "حسرت")),
+        (("😡", "🤦", "😤"), ("اشتباه", "عصبان", "اشتباهات", "گند", "خراب", "بهانه")),
+        (("🤔", "🧐", "😕"), ("چرا", "چگونه", "چطور", "سوال", "سؤال", "شک", "فکر کن", "تردید")),
+        (("🏆", "🥳", "😍"), ("موفق", "پیروزی", "برنده", "دستاورد", "افتخار", "نتیجه گرفت")),
+        (("💪", "🔥", "🚀"), ("تلاش", "پشتکار", "انگیزه", "قدرت", "شروع", "حرکت", "استمرار")),
+        (("🧠", "💡", "📚"), ("ذهن", "یادگیری", "آموزش", "دانش", "ایده", "مهارت", "تصمیم")),
+        (("💰", "📈", "💎"), ("پول", "درآمد", "ثروت", "سرمایه", "مالی", "فروش")),
+        (("🤝", "👥", "🫂"), ("تیم", "همکاری", "رهبری", "اعتماد", "ارتباط", "استقلال")),
+        (("⏳", "🗓️", "⌛"), ("زمان", "برنامه", "عادت", "فرصت", "امروز", "فردا")),
+        (("⚠️", "🚨", "❌"), ("خطر", "هشدار", "مراقب", "نباید", "ممنوع", "ریسک")),
+        (("❤️", "🫶", "😊"), ("عشق", "احترام", "خانواده", "رابطه", "مهربان", "حمایت")),
+    ]
+    for emojis, words in groups:
+        if any(norm(w) in t for w in words):
+            # Choose a stable variant from sentence content, avoiding random visual noise.
+            idx = int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:4], 16) % len(emojis)
+            return emojis[idx]
+    return "✨"
+
 def icon_svg(text, color="#FFD21F", size=320, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
@@ -330,18 +361,14 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    icon = icon_svg(text, YELLOW, 300, icon_override)
+    emoji = choose_emoji(text)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:660px;height:300px;display:flex;justify-content:center;"
-        f"align-items:center;}}"
-        f".animated-svg {{"
-        f"  animation: softPulse 2.4s ease-in-out infinite alternate;"
-        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
-        f"}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:650px;height:320px;display:flex;justify-content:center;align-items:center;}}"
+        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:230px;line-height:1;filter:drop-shadow(0 12px 24px rgba(255,210,31,.24));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
         f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
@@ -356,7 +383,7 @@ def sub_html(text, icon_override=None):
         f"  100% {{ transform: scale(1.05); opacity: 1; }}"
         f"}}"
         f"</style></head><body>"
-        f"<div class='sub-icon'>{icon}</div>"
+        f"<div class='sub-icon'><span class='emoji'>{emoji}</span></div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
         f"</body></html>"
@@ -365,7 +392,7 @@ def sub_html(text, icon_override=None):
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
     word = cover_word(hook)
-    icon = icon_svg(word, YELLOW, 380)
+    emoji = choose_emoji(hook + " " + word)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
@@ -374,7 +401,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"align-items:center;justify-content:center;text-align:center;position:relative}}"
         f".bg-glow{{position:absolute;width:850px;height:850px;background:radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);border-radius:50%;}}"
         f".icon{{margin-bottom:50px;display:flex;align-items:center;justify-content:center;z-index:2;height:380px}}"
-        f".animated-svg {{ animation: coverPulse 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 0 30px rgba(255,210,31,0.6)); }}"
+        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:300px;line-height:1;filter:drop-shadow(0 14px 30px rgba(255,210,31,.28));animation:coverPulse 2.8s ease-in-out infinite alternate;}}"
         f".word{{color:{YELLOW};font-weight:800;font-size:124px;line-height:1.42;max-width:940px;"
         f"padding:0 28px;box-sizing:border-box;letter-spacing:0;direction:rtl;text-wrap:balance;"
         f"text-shadow:0 0 36px rgba(255,210,31,0.28);z-index:2}}"
@@ -385,7 +412,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"}}"
         f"</style></head><body>"
         f"<div class='bg-glow'></div>"
-        f"<div class='icon'>{icon}</div>"
+        f"<div class='icon'><span class='emoji'>{emoji}</span></div>"
         f"<div class='word'>{html.escape(word)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
         f"</body></html>"
