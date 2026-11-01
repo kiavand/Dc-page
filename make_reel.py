@@ -36,6 +36,7 @@ MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
+BACKGROUND = "#050508"  # واحد رنگ پس‌زمینه برای کاور، صحنه‌ها و پایان ویدئو
 YELLOW = "#FFD21F"
 
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -232,6 +233,37 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
+# ---------------------------------------------------------------- semantic emoji system
+# Select one expressive emoji from the actual sentence; deterministic and context-aware.
+def choose_emoji(text):
+    t = norm(text).lower()
+    rules = [
+        (("😂", ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),),
+    ]
+    # Emotion and conversational intent take priority over generic topic icons.
+    groups = [
+        (("😂", "🤣", "😅"), ("خنده", "خندید", "خنده دار", "شوخی", "طنز", "بامزه", "مسخره")),
+        (("😳", "🤯", "😮"), ("باور نکردنی", "تعجب", "شگفت", "غافلگیر", "عجیب", "تصور نمی")),
+        (("😔", "🥺", "😢"), ("غم", "ناراحت", "شکست", "تنهایی", "ناامید", "دلسرد", "حسرت")),
+        (("😡", "🤦", "😤"), ("اشتباه", "عصبان", "اشتباهات", "گند", "خراب", "بهانه")),
+        (("🤔", "🧐", "😕"), ("چرا", "چگونه", "چطور", "سوال", "سؤال", "شک", "فکر کن", "تردید")),
+        (("🏆", "🥳", "😍"), ("موفق", "پیروزی", "برنده", "دستاورد", "افتخار", "نتیجه گرفت")),
+        (("💪", "🔥", "🚀"), ("تلاش", "پشتکار", "انگیزه", "قدرت", "شروع", "حرکت", "استمرار")),
+        (("🧠", "💡", "📚"), ("ذهن", "یادگیری", "آموزش", "دانش", "ایده", "مهارت", "تصمیم")),
+        (("💰", "📈", "💎"), ("پول", "درآمد", "ثروت", "سرمایه", "مالی", "فروش")),
+        (("🤝", "👥", "🫂"), ("تیم", "همکاری", "رهبری", "اعتماد", "ارتباط", "استقلال")),
+        (("⏳", "🗓️", "⌛"), ("زمان", "برنامه", "عادت", "فرصت", "امروز", "فردا")),
+        (("⚠️", "🚨", "❌"), ("خطر", "هشدار", "مراقب", "نباید", "ممنوع", "ریسک")),
+        (("❤️", "🫶", "😊"), ("عشق", "احترام", "خانواده", "رابطه", "مهربان", "حمایت")),
+    ]
+    for emojis, words in groups:
+        if any(norm(w) in t for w in words):
+            # Choose a stable variant from sentence content, avoiding random visual noise.
+            idx = int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:4], 16) % len(emojis)
+            return emojis[idx]
+    return "✨"
+
+
 def icon_svg(text, color="#FFD21F", size=320, kind_override=None):
     kind = kind_override or icon_kind(text)
     paths = {
@@ -292,14 +324,14 @@ def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f".bg-cinematic {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: radial-gradient(circle at 50% 35%, rgba(35,35,55,0.7) 0%, rgba(8,8,12,0.99) 80%);"
+        f"  background: {BACKGROUND};"
         f"}}"
         f".glow-orb {{"
         f"  position: absolute; width: 650px; height: 650px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
-        f"  background: radial-gradient(circle, rgba(255,210,31,0.08) 0%, rgba(0,0,0,0) 70%);"
+        f"  background: transparent;"
         f"  border-radius: 50%; pointer-events: none;"
         f"}}"
         f"</style></head><body>"
@@ -330,18 +362,14 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    icon = icon_svg(text, YELLOW, 300, icon_override)
+    emoji = choose_emoji(text)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:660px;height:300px;display:flex;justify-content:center;"
-        f"align-items:center;}}"
-        f".animated-svg {{"
-        f"  animation: softPulse 2.4s ease-in-out infinite alternate;"
-        f"  filter: drop-shadow(0 0 22px rgba(255,210,31,0.5));"
-        f"}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:650px;height:320px;display:flex;justify-content:center;align-items:center;}}"
+        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:230px;line-height:1;filter:drop-shadow(0 12px 24px rgba(255,210,31,.24));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
         f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
@@ -356,7 +384,7 @@ def sub_html(text, icon_override=None):
         f"  100% {{ transform: scale(1.05); opacity: 1; }}"
         f"}}"
         f"</style></head><body>"
-        f"<div class='sub-icon'>{icon}</div>"
+        f"<div class='sub-icon'><span class='emoji'>{emoji}</span></div>"
         f"<div class='w'><div class='b'>{safe}</div></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
         f"</body></html>"
@@ -378,23 +406,22 @@ def brand_logo_svg(size=112):
 
 
 def cover_html(hook, tag=None, mascot=False, cover_image=None):
-    """Clean cinematic cover matching the reel's dark background, with no top banner."""
+    """Clean cinematic cover matching reel background; expressive semantic emoji, no top banner."""
     word = cover_word(hook)
-    icon = icon_svg(hook, YELLOW, 390)
+    emoji = choose_emoji(hook + " " + word)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        # Match the dark base used by the video/outro; keep the center subtly illuminated for contrast.
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
-        f".grain{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 43%,rgba(255,210,31,.085),transparent 48%),"
-        f"linear-gradient(145deg,rgba(255,255,255,.018),transparent 42%,rgba(255,210,31,.018));pointer-events:none}}"
+        f".grain{{position:absolute;inset:0;background:transparent;pointer-events:none}}"
         f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
         f"margin-top:-55px;position:relative}}"
         f".visual:before{{content:'';position:absolute;width:460px;height:460px;border-radius:50%;"
         f"border:1px solid rgba(255,210,31,.14);box-shadow:0 0 65px rgba(255,210,31,.055),inset 0 0 48px rgba(255,210,31,.035)}}"
-        f".animated-svg{{filter:drop-shadow(0 0 24px rgba(255,210,31,.28));animation:float 4s ease-in-out infinite}}"
+        f".emoji{{font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif;font-size:300px;line-height:1;"
+        f"filter:drop-shadow(0 14px 30px rgba(255,210,31,.28));animation:float 4s ease-in-out infinite}}"
         f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
         f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.16);margin-top:-4px}}"
         f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:25px}}"
@@ -402,7 +429,7 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None):
         f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px rgba(255,210,31,.22);z-index:2}}"
         f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
         f"</style></head><body><div class='grain'></div>"
-        f"<div class='visual'>{icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
+        f"<div class='visual'><span class='emoji'>{emoji}</span></div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>"
     )
 
@@ -412,7 +439,7 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#050508}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
