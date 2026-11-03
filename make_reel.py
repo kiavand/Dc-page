@@ -489,10 +489,28 @@ def cover_word(hook):
 
 
 def bg_html(image_path, idx, total, title):
-    """Clean black scene plate; the icon changes together with each subtitle."""
+    """Layered cinematic gradient plate; each scene gets a coordinated accent palette."""
+    palettes = [
+        ("#10152d", "#28143d", "#37d6c2"),
+        ("#111b2b", "#302018", "#ffbd59"),
+        ("#101d25", "#241638", "#63d5ff"),
+        ("#21152b", "#102a32", "#ff6f91"),
+        ("#151b2b", "#292014", "#b69cff"),
+        ("#101d20", "#282039", "#8de0a1"),
+    ]
+    c1, c2, accent = palettes[(max(1, idx) - 1) % len(palettes)]
+    shift = (idx * 37) % 100
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
-            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#000}}</style>"
-            f"</head><body></body></html>")
+            f"<style>html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:#05060b}}"
+            f".base{{position:absolute;inset:0;background:radial-gradient(ellipse at {28+shift//4}% 24%,{c1} 0%,transparent 54%),"
+            f"radial-gradient(ellipse at {78-shift//5}% 76%,{c2} 0%,transparent 58%),linear-gradient(145deg,#080a12,#050509 68%,#10101a)}}"
+            f".aura{{position:absolute;width:1050px;height:1050px;left:50%;top:43%;transform:translate(-50%,-50%);"
+            f"background:radial-gradient(circle,{accent}20 0%,{accent}0b 34%,transparent 70%);filter:blur(18px)}}"
+            f".grain{{position:absolute;inset:0;opacity:.12;background-image:radial-gradient({accent}55 0.7px,transparent .8px);"
+            f"background-size:9px 9px;mask-image:linear-gradient(to bottom,transparent,#000 22%,#000 82%,transparent)}}"
+            f".edge{{position:absolute;inset:36px;border:1px solid {accent}20;border-radius:54px;"
+            f"box-shadow:inset 0 0 90px #0008,0 0 50px {accent}0a}}"
+            f"</style></head><body><div class='base'></div><div class='aura'></div><div class='grain'></div><div class='edge'></div></body></html>")
 
 
 def sub_html(text, icon_override=None):
@@ -528,9 +546,9 @@ def sub_html(text, icon_override=None):
             f".sub-icon{{position:absolute;left:0;right:0;top:820px;display:flex;justify-content:center;"
             f"align-items:center;filter:drop-shadow(0 0 18px rgba(255,210,31,.24));}}"
             f".w{{position:absolute;left:60px;right:60px;top:1010px;display:flex;justify-content:center}}"
-            f".b{{max-width:920px;background:rgba(0,0,0,.9);color:#fff;font-family:{FONT};"
+            f".b{{max-width:920px;background:linear-gradient(135deg,rgba(17,20,34,.94),rgba(8,9,16,.94));color:#fff;font-family:{FONT};"
             f"font-weight:800;font-size:{size}px;line-height:1.65;padding:24px 36px;"
-            f"border-radius:28px;text-align:center;border:2px solid rgba(255,255,255,.14)}}"
+            f"border-radius:28px;text-align:center;border:2px solid rgba(255,210,31,.24);box-shadow:0 24px 70px #0009,0 0 34px rgba(255,210,31,.08)}}"
             f".kw{{color:{YELLOW};text-shadow:0 0 12px rgba(255,210,31,.2)}}"
             f".brand{{position:absolute;left:0;right:0;top:1500px;text-align:center;color:{YELLOW};"
             f"font-family:{FONT};font-size:38px;font-weight:800;line-height:1.55;"
@@ -750,14 +768,11 @@ def render_pages(jobs):
 
 # ---------------------------------------------------------------- video
 def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
-    """bg with slow zoom + timed subtitle overlays. subs: [(png, start, end)]."""
+    """Cinematic slow camera move with timed icon/text entrance and exit motion."""
     length = dur + (0 if is_last else XFADE)
     frames = int(length * FPS) + 2
-    inc = 0.12 / frames
-    if idx % 2 == 0:
-        z = f"min(zoom+{inc:.6f},1.12)"
-    else:
-        z = f"if(eq(on,0),1.12,max(zoom-{inc:.6f},1.0))"
+    inc = 0.12 / max(frames, 1)
+    z = f"min(zoom+{inc:.6f},1.12)" if idx % 2 == 0 else f"if(eq(on,0),1.12,max(zoom-{inc:.6f},1.0))"
     cmd = ["ffmpeg", "-y", "-i", str(bg_png)]
     for png, _, _ in list(mascots) + list(subs):
         cmd += ["-i", str(png)]
@@ -765,15 +780,21 @@ def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last = "v0"
     for k, (_, a, b) in enumerate(mascots, start=1):
-        fc += (f";[{last}][{k}:v]overlay=x=0:y='14*sin(2*PI*(t-{a:.3f})/1.8)':"
+        fc += (f";[{k}:v]format=rgba,fade=t=in:st=0:d=0.30:alpha=1[mas{k}];"
+               f"[{last}][mas{k}]overlay=x=0:y='10+8*sin(2*PI*(t-{a:.3f})/2)':"
                f"enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
         last = f"v{k}"
     base = len(mascots)
     for k, (_, a, b) in enumerate(subs, start=base + 1):
-        fc += f";[{last}][{k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]"
+        local_dur = max(0.35, b - a)
+        fade_out_start = max(0.0, local_dur - 0.24)
+        fc += (f";[{k}:v]format=rgba,fade=t=in:st=0:d=0.28:alpha=1,"
+               f"fade=t=out:st={fade_out_start:.3f}:d=0.22:alpha=1[sub{k}];"
+               f"[{last}][sub{k}]overlay=x=0:y='if(lt(t,{a+0.28:.3f}),18*(1-(t-{a:.3f})/0.28),0)':"
+               f"enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
         last = f"v{k}"
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
             "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)]
     run(cmd)
 
@@ -798,10 +819,13 @@ def assemble(clips, durs, voice_wav, music, out):
     if music:
         cmd += ["-stream_loop", "-1", "-i", str(music)]
     fc, last, start = "", "[0:v]", 0.0
+    transitions = ("fade", "smoothleft", "circleopen", "wipeleft", "pixelize", "radial", "dissolve")
     for i in range(1, len(clips)):
         start += durs[i - 1]
-        fc += (f"{last}[{i}:v]xfade=transition=fade:duration={XFADE}:"
-               f"offset={start:.3f}[x{i}];")
+        transition = transitions[(i - 1) % len(transitions)]
+        offset = max(0.0, start - XFADE * i)
+        fc += (f"{last}[{i}:v]xfade=transition={transition}:duration={XFADE}:"
+               f"offset={offset:.3f}[x{i}];")
         last = f"[x{i}]"
     fc += f"{last}null[vout];" if len(clips) > 1 else "[0:v]null[vout];"
     if music:
