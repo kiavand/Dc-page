@@ -50,12 +50,13 @@ jobs:
         id: poll
         run: python bot.py poll
 
-      - name: Install FFmpeg and Chromium
+      - name: Install FFmpeg, Persian fallback fonts and Chromium
         if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-noto-color-emoji
+          sudo apt-get install -y ffmpeg fontconfig fonts-noto-core fonts-noto-extra
           python -m playwright install --with-deps chromium
+          fc-cache -f
 
       - name: Build and send reels
         if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
