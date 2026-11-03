@@ -282,6 +282,33 @@ def icon_kind(text):
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
 
 
+
+ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location')
+ICON_ALTERNATES = {
+ "brain": ("book", "bulb", "eye", "puzzle", "network"),
+ "target": ("compass", "flag", "mountain", "star", "growth"),
+ "growth": ("stairs", "tree", "mountain", "star", "trophy"),
+ "book": ("bulb", "brain", "chat", "puzzle", "network"),
+ "heart": ("handshake", "people", "partnership", "home", "bird"),
+ "time": ("calendar", "sun", "moon", "sleep", "stairs"),
+ "question": ("eye", "puzzle", "compass", "brain", "book"),
+ "people": ("woman", "man", "handshake", "partnership", "network"),
+ "money": ("coin", "growth", "shop", "crown", "scales"),
+ "sleep": ("bed", "moon", "calendar", "home", "time"),
+}
+
+def assign_unique_icon_kinds(texts, reserved=()):
+    used=set(reserved); result=[]
+    for text in texts:
+        preferred=icon_kind(text)
+        candidates=[preferred, *ICON_ALTERNATES.get(preferred, ())]
+        candidates += [k for k in ICON_LIBRARY if k not in candidates]
+        chosen=next((k for k in candidates if k not in used), None)
+        if chosen is None:
+            chosen=next((k for k in candidates if not result or k != result[-1]), preferred)
+        result.append(chosen); used.add(chosen)
+    return result
+
 def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     """Inline, dependency-free vector icons selected from the scene topic."""
     kind = kind_override or icon_kind(text)
@@ -519,16 +546,18 @@ def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
     
     cmd = ["ffmpeg", "-y", "-i", str(bg_png)]
     for png, _, _ in list(mascots) + list(subs):
-        cmd += ["-i", str(png)]
-        
+        cmd += ["-loop", "1", "-t", f"{length:.3f}", "-i", str(png)]
+
     fc = (f"[0:v]scale={W*2}:{H*2},zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last = "v0"
     base = len(mascots)
     for k, (_, a, b) in enumerate(subs, start=base + 1):
-        fc += f";[{last}][{k}:v]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]"
+        fade_d = min(0.22, max(0.10, (b-a)/4.0))
+        fc += (f";[{k}:v]format=rgba,fade=t=in:st={a:.3f}:d={fade_d:.3f}:alpha=1[ov{k}]"
+               f";[{last}][ov{k}]overlay=0:0:enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
         last = f"v{k}"
-        
+
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)]
@@ -596,6 +625,9 @@ async def build(hook, scenes, d, dst, tag=None):
     n = len(audio)
 
     jobs, bg_pngs, sub_pngs = [], [], []
+    cover_kind = icon_kind(hook + " " + cover_word(hook))
+    all_texts = [txt for sh in shots for txt in sh["chunks"]]
+    assigned_kinds = iter(assign_unique_icon_kinds(all_texts, reserved=(cover_kind,)))
     cover_png = d / "cover.png"
     jobs.append((cover_html(hook), cover_png, False))
     bg_pngs.append(cover_png)
@@ -608,7 +640,7 @@ async def build(hook, scenes, d, dst, tag=None):
         row = []
         for j, (txt, a, b) in enumerate(audio[k][1]):
             sp = d / f"sub{k:02d}_{j:02d}.png"
-            chosen_kind = icon_kind(txt)
+            chosen_kind = next(assigned_kinds)
             jobs.append((sub_html(txt, chosen_kind), sp, True))
             row.append((sp, a, b))
         sub_pngs.append(row)
