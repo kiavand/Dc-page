@@ -16,8 +16,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reel import norm, strip_marks
-
+from make_reel import UA, norm, strip_marks
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -47,23 +46,25 @@ HELP = (
 )
 
 EDITOR_PROMPT = """تو فقط ویراستار املایی و ساختاری متن فارسی هستی؛ نویسنده یا خلاصه‌نویس نیستی.
-هدف: آماده‌کردن همان متن برای خواندن طبیعی، روان و بدون اشکال با صدای فارسی فرید (fa-IR-FaridNeural).
-قوانین قطعی و حیاتی برای تلفظ گوینده:
+هدف: آماده‌کردن همان متن برای خواندن طبیعی با صدای فارسی فرید (fa-IR-FaridNeural).
+قوانین قطعی:
 - متن را خلاصه نکن و کوتاه نکن.
 - هیچ جمله، مثال، توضیح، دلیل، نکته، تکرارِ معنادار یا نتیجه‌گیری را حذف نکن.
 - ترتیب جمله‌ها و ایده‌ها را حفظ کن؛ چیزی از خودت اضافه نکن.
 - فقط غلط املایی و تایپی، نشانه‌گذاری، فاصله و نیم‌فاصله، و جمله‌بندیِ لازم برای خواندن راحت‌تر را اصلاح کن.
-- برای مکث طبیعی از ویرگول و نقطه استفاده کن. برای اینکه هوش مصنوعی (فرید) کلمات را با لحن کاملاً انسانی و بدون اشتباه تلفظ کند، کسرهٔ اضافه (مانند زیرِ اسم‌ها و صفت‌ها مثل «مسیرِ رشد»، «کلیدِ موفقیت»)، همزه (مثل «مسئولیت»، «تأثیر») و تشدیدِ لازم را دقیق و هوشمندانه در متن درج کن. اعراب‌گذاری باید کامل و راهگشای خوانش دقیق گوینده باشد.
-- واژه‌ها را با مترادف جایگزین نکن مگر برای اصلاح یک غلط املایی واضح.
+- برای مکث طبیعی از ویرگول و نقطه استفاده کن. هرجا برای تلفظ دقیق لازم است، کسرهٔ اضافه، همزه و تشدید را به‌صورت درست و هدفمند اضافه کن؛ از اعراب‌گذاریِ بی‌مورد یا حدسی خودداری کن.
+- کسرهٔ اضافه را در ترکیب‌هایی مثل «مدیریتِ زمان» یا «تأثیرِ تصمیم» هرجا خوانش بدون آن مبهم یا نادرست می‌شود، درج کن. همزه و تشدیدِ واژه‌ها را نیز مطابق املای معیار اصلاح کن؛ مانند «تأثیر»، «مسئولیت»، «مؤثر» و «دقّت».
+- اعراب و نشانه‌های کمکی باید به متنِ گویندگی اضافه شوند، نه اینکه کلمات یا محتوای متن تغییر کند.
+- واژه‌ها را با مترادف جایگزین نکن مگر برای اصلاح یک غلط واضح.
 - متن خروجی باید تقریباً هم‌اندازه متن ورودی باشد؛ کاهش محسوس تعداد کلمات ممنوع است.
 - فقط قالب را مرتب کن: اگر متن تیتر دارد، همان تیتر را نگه دار؛ متن را به صحنه‌های خوانا تقسیم کن، بدون حذف یا ادغامِ محتوایی.
+- اگر تیتر یا صحنه‌بندی لازم است، از واژه‌های خود متن استفاده کن و هیچ بخشی از روایت را قربانی کوتاهی تیتر نکن.
 - خروجی فقط متن ویرایش‌شده باشد؛ توضیح اضافه، شماره‌گذاری یا Markdown اضافی نده.
 """
-
 REVIEW_PROMPT = """تو ویراستار نهایی فارسی برای گویندگی فرید هستی، نه خلاصه‌نویس.
 متن اصلی مرجع قطعی است. پیش‌نویس را با متن اصلی مقایسه کن و هر جمله، مثال، توضیح یا نکته‌ای که حذف یا کوتاه شده به آن برگردان.
 هیچ بخشی را خلاصه نکن؛ هیچ نکته یا جمله‌ای اضافه نکن؛ ترتیب ایده‌ها را حفظ کن.
-فقط املا، نشانه‌گذاری، نیم‌فاصله، مکث‌ها و خوانایی برای بلندخوانی را اصلاح کن؛ همچنین کسرهٔ اضافه، همزه و تشدیدِ لازم برای تلفظ بی‌نقص توسط مدل صوتی را اعمال کن تا هیچ کلمه‌ای مبهم خوانده نشود.
+فقط املا، نشانه‌گذاری، نیم‌فاصله، مکث‌ها و خوانایی برای بلندخوانی را اصلاح کن؛ کسرهٔ اضافه، همزه و تشدیدِ لازم برای تلفظ درست را هم درج کن، بدون اعراب‌گذاری افراطی.
 متن نهایی باید از نظر محتوا و طول تقریباً برابر متن اصلی باشد.
 اگر بین روان‌خوانی و حفظ محتوا تعارض بود، حفظ کامل محتوا اولویت دارد.
 خروجی فقط متن نهایی با همان ساختار تیتر/صحنه باشد.
@@ -126,11 +127,10 @@ def llm(system, user, temperature=0.3):
         "model": "openai", "temperature": temperature,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }).encode()
-    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
     for url in ("https://text.pollinations.ai/openai", "https://gen.pollinations.ai/v1/chat/completions"):
         try:
             req = urllib.request.Request(url, data=payload, headers={
-                "Content-Type": "application/json", "User-Agent": ua})
+                "Content-Type": "application/json", "User-Agent": UA})
             with urllib.request.urlopen(req, timeout=75) as response:
                 data = json.loads(response.read().decode("utf-8"))
             result = (data["choices"][0]["message"]["content"] or "").strip()
@@ -194,6 +194,7 @@ def improve(text):
     draft = clean_script(llm(EDITOR_PROMPT, "متن نویسنده:\n" + text, 0.35))
     if not draft or not valid_script(draft) or not digits(draft).issubset(digits(text)):
         return None
+    # Reject obvious AI summaries: edited narration must retain at least 85% of source words.
     source_words = len(re.findall(r"\S+", text))
     draft_words = len(re.findall(r"\S+", draft))
     if source_words >= 25 and draft_words < source_words * 0.85:
@@ -301,6 +302,7 @@ def poll():
         message = update.get("message") or {}
         if str(message.get("chat", {}).get("id")) != CHAT_ID:
             continue
+        # Ignore messages sent by bots and non-text messages.
         if message.get("from", {}).get("is_bot") or not message.get("text"):
             continue
         jobs += on_text(message, update["update_id"])
@@ -322,6 +324,17 @@ def shrink_if_needed(path):
     if result.returncode == 0 and small.exists() and small.stat().st_size <= MAX_TG_BYTES:
         return small
     return path
+
+
+def mascot_report(log):
+    found = re.search(r"^MASCOT: found=(.*)$", log, re.M)
+    used = re.search(r"^MASCOT: used=(.*)$", log, re.M)
+    if not found or found.group(1).strip() == "none":
+        return "🦁 فایل تصویر شیر پیدا نشد؛ اگر به شیر نیاز داری، فایل‌های تصویر را در پوشه mascot قرار بده."
+    report = "🦁 فایل‌های شیر پیدا شده: " + found.group(1).strip()
+    if used and used.group(1).strip() != "none":
+        report += "\nحالت‌های استفاده‌شده: " + used.group(1).strip()
+    return report
 
 
 def send_results(job, video, log):
@@ -354,12 +367,15 @@ def build():
             if result.returncode != 0 or not out.exists() or out.stat().st_size == 0:
                 tail = "\n".join(log.strip().splitlines()[-15:])
                 say("❌ ساخت ویدیو خطا داد.\n" + run_url() + "\n\n" + tail[-1200:])
+                # Keep the job in the queue; the next scheduled run can retry it.
                 continue
             if send_results(job, out, log):
                 job.unlink(missing_ok=True)
+            # Retain failed uploads in the queue for the next scheduled retry.
         except Exception as exc:
             print("BUILD_ERROR:", type(exc).__name__, str(exc)[:500])
             say("❌ هنگام ساخت یا ارسال ویدیو خطا رخ داد.\n" + run_url())
+            # Keep the job file in work/ so a later workflow run can retry it.
 
 
 if __name__ == "__main__":
