@@ -24,6 +24,10 @@ import urllib.request
 import edge_tts
 from pathlib import Path
 
+# Shared user-agent used by bot.py for resilient text-service requests.
+UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
 W, H, FPS = 1080, 1920, 30
 GAP = 0.30                       # pause between sentences (s)
 OPENING_LEAD = 0.50              # silence before the first spoken word
