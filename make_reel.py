@@ -24,7 +24,7 @@ import urllib.request
 import edge_tts
 from pathlib import Path
 
-# Shared user-agent used by bot.py for resilient text-service requests.
+# Shared User-Agent used by bot.py for reliable Telegram/API requests.
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -209,6 +209,9 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
 def icon_kind(text):
     t = norm(text).lower()
     specific_rules = [
+        # Dedicated technology and crypto symbols take priority over generic network/money rules.
+        (("هوش مصنوعی", "هوش مصنوعی", "ai", "ربات", "ربات هوشمند", "مدل زبانی", "چت بات", "چتبات", "قرارداد هوشمند", "قرارداد", "اسمارت کانترکت", "smart contract", "smart contracts", "کانترکت", "contract", "contracts"), "robot"),
+        (("بلاکچین", "بلاک چین", "ارز دیجیتال", "ارزدیجیتال", "کریپتو", "رمزارز", "رمز ارز", "بیت کوین", "بیتکوین", "bitcoin", "btc", "اتریوم", "اتریوم", "توکن", "کوین", "کیف پول دیجیتال"), "bitcoin"),
         # Dedicated figures and objects. Exact word boundaries avoid false matches
         # such as "زن" inside "زندگی" or "شیر" inside "شیرین".
         (("زن", "زنان", "زنانه", "زن ها", "خانم", "خانم ها", "دختر", "دختران", "بانوان"), "woman"),
@@ -287,7 +290,7 @@ def icon_kind(text):
 
 
 
-ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location')
+ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin')
 ICON_ALTERNATES = {
  "brain": ("book", "bulb", "eye", "puzzle", "network"),
  "target": ("compass", "flag", "mountain", "star", "growth"),
@@ -297,7 +300,9 @@ ICON_ALTERNATES = {
  "time": ("calendar", "sun", "moon", "sleep", "stairs"),
  "question": ("eye", "puzzle", "compass", "brain", "book"),
  "people": ("woman", "man", "handshake", "partnership", "network"),
- "money": ("coin", "growth", "shop", "crown", "scales"),
+ "money": ("bitcoin", "growth", "shop", "crown", "scales"),
+ "robot": ("network", "brain", "gear", "bulb", "shield"),
+ "bitcoin": ("money", "network", "growth", "scales", "lock"),
  "sleep": ("bed", "moon", "calendar", "home", "time"),
 }
 
@@ -317,6 +322,9 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     """Inline, dependency-free vector icons selected from the scene topic."""
     kind = kind_override or icon_kind(text)
     paths = {
+        # Purpose-built, optically balanced symbols: symmetric robot + Bitcoin coin.
+        "robot": "<path d='M60 10v12M54 10h12'/><rect x='24' y='31' width='72' height='58' rx='18'/><path d='M24 49H13v23h11M96 49h11v23H96M39 89v12M81 89v12M45 101h30M39 54h10M71 54h10'/><rect x='43' y='43' width='34' height='23' rx='7'/><circle cx='51' cy='54' r='3' fill='currentColor'/><circle cx='69' cy='54' r='3' fill='currentColor'/><path d='M49 76h22M60 22v9'/>",
+        "bitcoin": "<circle cx='60' cy='60' r='49'/><circle cx='60' cy='60' r='40'/><path d='M49 27v66M68 27v66M42 37h25c19 0 22 23 4 26 22 2 20 29 0 29H42M42 37h29M42 89h29'/><path d='M43 18v8M77 18v8M43 94v8M77 94v8'/>",
         "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
         "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
         "target": "<circle cx='60' cy='60' r='42'/><circle cx='60' cy='60' r='27'/><circle cx='60' cy='60' r='11'/><path d='M60 60 99 21M83 21h16v16'/>",
@@ -372,7 +380,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:drop-shadow(0 5px 2px rgba(255,255,255,.16)) drop-shadow(0 0 12px rgba(255,255,255,.12))'>"
+            f"style='filter:{"drop-shadow(0 7px 4px rgba(0,0,0,.48)) drop-shadow(0 0 15px rgba(0,210,255,.30))" if kind == "robot" else "drop-shadow(0 7px 4px rgba(0,0,0,.48)) drop-shadow(0 0 15px rgba(255,176,32,.30))" if kind == "bitcoin" else "drop-shadow(0 5px 2px rgba(255,255,255,.16)) drop-shadow(0 0 12px rgba(255,255,255,.12))"}'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
