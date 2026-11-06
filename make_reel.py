@@ -290,7 +290,7 @@ def icon_kind(text):
 
 
 
-ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin')
+ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin', 'shop', 'tree')
 ICON_ALTERNATES = {
  "brain": ("book", "bulb", "eye", "puzzle", "network"),
  "target": ("compass", "flag", "mountain", "star", "growth"),
@@ -325,6 +325,8 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         # Purpose-built, optically balanced symbols: symmetric robot + Bitcoin coin.
         "robot": "<path d='M60 10v12M54 10h12'/><rect x='24' y='31' width='72' height='58' rx='18'/><path d='M24 49H13v23h11M96 49h11v23H96M39 89v12M81 89v12M45 101h30M39 54h10M71 54h10'/><rect x='43' y='43' width='34' height='23' rx='7'/><circle cx='51' cy='54' r='3' fill='currentColor'/><circle cx='69' cy='54' r='3' fill='currentColor'/><path d='M49 76h22M60 22v9'/>",
         "bitcoin": "<circle cx='60' cy='60' r='49'/><circle cx='60' cy='60' r='40'/><path d='M49 27v66M68 27v66M42 37h25c19 0 22 23 4 26 22 2 20 29 0 29H42M42 37h29M42 89h29'/><path d='M43 18v8M77 18v8M43 94v8M77 94v8'/>",
+        "shop": "<path d='M18 48h84v57H18Z'/><path d='m13 48 10-27h74l10 27M13 48c0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0'/><path d='M38 105V72h24v33M74 69h16v16H74Z'/>",
+        "tree": "<path d='M60 12 27 52h18L22 78h29v29h18V78h29L75 52h18Z'/><path d='M60 82v25'/>",
         "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
         "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
         "target": "<circle cx='60' cy='60' r='42'/><circle cx='60' cy='60' r='27'/><circle cx='60' cy='60' r='11'/><path d='M60 60 99 21M83 21h16v16'/>",
@@ -363,7 +365,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         "fox": "<path d='M20 23 46 35 60 24 74 35 100 23 94 72 60 105 26 72Z'/><path d='M39 57l14 5M81 57l-14 5M53 76l7 7 7-7M60 83v8' />",
         "wolf": "<path d='M17 18 43 32 60 25 77 32 103 18 98 66 84 91 60 108 36 91 22 66Z'/><path d='M39 55l14 5M81 55l-14 5M53 75l7 7 7-7M60 82l-9 9M60 82l9 9M46 38l-8-11M74 38l8-11' />",
         "sheep": "<path d='M35 45c-13-12 1-30 16-21 7-17 29-13 31 3 17-5 27 13 16 25 15 14 3 32-12 29-8 17-29 17-36 2-17 8-31-9-21-23-14-3-15-24 6-15Z'/><path d='M48 52h24c12 0 17 9 14 21l-8 20H42l-8-20c-3-12 2-21 14-21Z'/><path d='M49 65h1M71 65h1M55 79q5 5 10 0M42 91v15M78 91v15' />",
-        "cow": "<path d='M30 35 13 18 11 51 28 59M90 35l17-17 2 33-17  -8M34 43c0-18 12-28 26-28s26 10 26 28v40c0 16-12 27-26 27S34 99 34 83Z'/><path d='M44 58h1M75 58h1M44 82c8 12 24 12 32 0M48 82v8M72 82v8' />",
+        "cow": "<path d='M30 35 13 18 11 51 28 59M90 35l17-17 2 33-17 8M34 43c0-18 12-28 26-28s26 10 26 28v40c0 16-12 27-26 27S34 99 34 83Z'/><path d='M44 58h1M75 58h1M44 82c8 12 24 12 32 0M48 82v8M72 82v8' />",
         "phone": "<path d='M34 15 20 29c-5 5 1 25 22 46s41 27 46 22l14-14-22-20-13 12c-9-5-17-13-22-22l12-13Z'/><path d='M70 18c17 4 28 15 32 32M70 34c9 2 14 7 16 16'/>",
         "megaphone": "<path d='M15 48h22l57-25v74L37 72H15Z'/><path d='m37 72 9 28h19L54 79M15 48v24M105 44l9-8M105 72l9 8'/>",
         "gear": "<path d='M52 10h16l4 13 10 4 11-7 12 12-7 11 4 10 13 4v16l-13 4-4 10 7 11-12 12-11-7-10 4-4 13H52l-4-13-10-4-11 7-12-12 7-11-4-10-13-4V54l13-4 4-10-7-11 12-12 11 7 10-4Z'/><circle cx='60' cy='62' r='19'/>",
@@ -377,6 +379,8 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         "car": "<path d='m18 70 10-30h64l10 30v25H18Z'/><path d='M28 40 40 20h40l12 20M18 70h84M32 95v10M88 95v10'/><circle cx='34' cy='75' r='7'/><circle cx='86' cy='75' r='7'/>",
         "location": "<path d='M60 110S22 68 22 46a38 38 0 1 1 76 0c0 22-38 64-38 64Z'/><circle cx='60' cy='46' r='13'/>",
     }
+    if kind not in paths:
+        kind = "spark"
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
