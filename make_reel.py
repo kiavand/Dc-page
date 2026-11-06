@@ -142,12 +142,48 @@ def split_chunks(text, max_chars=72):
 
 
 # ---------------------------------------------------------------- Edge-TTS
-async def tts(text, out_wav):
+async def tts(text, out_wav, retries=4):
+    """Generate speech robustly; Edge-TTS occasionally returns an empty stream.
+
+    Keep the configured voice (Farid) unchanged. Retry transient network/service
+    failures with backoff, and never let a zero-byte/partial audio file pass on.
+    """
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
-    communicate = edge_tts.Communicate(text, VOICE)
-    await communicate.save(str(out_wav))
+
+    out_wav = Path(out_wav)
+    last_error = None
+    for attempt in range(retries):
+        try:
+            # Remove partial output left by a failed stream before retrying.
+            try:
+                out_wav.unlink(missing_ok=True)
+            except TypeError:  # Python compatibility fallback
+                if out_wav.exists():
+                    out_wav.unlink()
+
+            communicate = edge_tts.Communicate(text, VOICE)
+            await asyncio.wait_for(communicate.save(str(out_wav)), timeout=90)
+            if not out_wav.exists() or out_wav.stat().st_size < 1024:
+                raise RuntimeError("Edge-TTS returned an empty or incomplete audio file.")
+            return
+        except Exception as exc:
+            last_error = exc
+            try:
+                out_wav.unlink(missing_ok=True)
+            except Exception:
+                pass
+            if attempt + 1 >= retries:
+                break
+            delay = min(2 ** attempt, 12)
+            print(f"[TTS] Attempt {attempt + 1}/{retries} failed: {type(exc).__name__}: {exc}. Retrying in {delay}s...", flush=True)
+            await asyncio.sleep(delay)
+
+    raise RuntimeError(
+        f"Edge-TTS failed after {retries} attempts for text: {text[:100]!r}. "
+        f"Last error: {type(last_error).__name__}: {last_error}"
+    ) from last_error
 
 
 def run(cmd):
