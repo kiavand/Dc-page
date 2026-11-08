@@ -1,10 +1,10 @@
-"""Persian Reel builder v4.4 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
+"""Persian Reel builder v4.5 (Ultra-Professional Cinematic Deep Olive & Gold Motion UI).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature high-end cinematic matte dark aesthetics with pixel-perfect optical alignment.
+Backgrounds feature high-end cinematic deep olive/matte dark aesthetics with motion icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -41,13 +41,13 @@ VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 
-# پالت رنگی حرفه‌ای: مشکی کربنی لوکس با گرادیانت کهکشانی بسیار عمیق برای حداکثر خوانایی و جلوه پرمیوم
-BACKGROUND = "#030305"
+# پالت رنگی حرفه‌ای: سبز لجنی/زیتونی بسیار تیره و عمیق در ترکیب با مشکی کربنی و طلایی پرمیوم
+BACKGROUND = "#09120B"
 BACKGROUND_CSS = (
-    "radial-gradient(circle at 50% 32%, rgba(35,35,55,0.65) 0%, rgba(8,8,12,0.95) 55%, #030305 100%)"
+    "radial-gradient(circle at 50% 30%, rgba(30,55,35,0.7) 0%, rgba(9,18,11,0.96) 60%, #060D08 100%)"
 )
 BACKGROUND_PATTERN = (
-    "radial-gradient(circle at 50% 32%, rgba(255,210,31,0.06) 0%, transparent 65%)"
+    "radial-gradient(circle at 50% 30%, rgba(255,210,31,0.07) 0%, transparent 70%)"
 )
 YELLOW = "#FFD21F"
 
@@ -450,7 +450,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:drop-shadow(0 10px 20px rgba(0,0,0,.65)) drop-shadow(0 0 20px rgba(255,210,31,.35))'>"
+            f"style='filter:drop-shadow(0 12px 25px rgba(0,0,0,.75)) drop-shadow(0 0 24px rgba(255,210,31,.4));animation:iconMotion 2.6s ease-in-out infinite alternate;'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
@@ -486,7 +486,7 @@ def bg_html(image_path, idx, total, title):
         f"  background: {BACKGROUND_CSS};"
         f"}}"
         f".glow-orb {{"
-        f"  position: absolute; width: 700px; height: 700px; top: 32%; left: 50%; transform: translate(-50%, -50%);"
+        f"  position: absolute; width: 750px; height: 750px; top: 30%; left: 50%; transform: translate(-50%, -50%);"
         f"  background: {BACKGROUND_PATTERN};"
         f"  border-radius: 50%; pointer-events: none;"
         f"}}"
@@ -518,26 +518,27 @@ def sub_html(text, icon_override=None):
         pat = re.compile(re.escape(highlighted), re.IGNORECASE)
         safe, count = pat.subn(lambda m: "<span class='kw'>" + m.group(0) + "</span>", safe, count=1)
 
-    icon = icon_svg(text, YELLOW, 260, icon_override)
+    icon = icon_svg(text, YELLOW, 280, icon_override)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:620px;height:320px;display:flex;justify-content:center;align-items:center;}}"
-        f".sub-icon svg{{width:260px;height:260px;filter:drop-shadow(0 12px 28px rgba(0,0,0,.7)) drop-shadow(0 0 24px rgba(255,210,31,.35));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:600px;height:340px;display:flex;justify-content:center;align-items:center;}}"
+        f".sub-icon svg{{width:280px;height:280px;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(10,10,14,0.96);color:#f3f4f6;font-family:{FONT};"
+        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(9,18,11,0.97);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
         f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
-        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.25);"
-        f"box-shadow:0 30px 70px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.12);}}"
-        f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 16px rgba(255,210,31,0.35)}}"
+        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.28);"
+        f"box-shadow:0 30px 70px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.15);}}"
+        f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 18px rgba(255,210,31,0.4)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.95;text-shadow:0 0 16px rgba(255,210,31,0.3)}}"
-        f"@keyframes softPulse {{"
-        f"  0% {{ transform: scale(0.93); opacity: 0.85; }}"
-        f"  100% {{ transform: scale(1.05); opacity: 1; }}"
+        f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.95;text-shadow:0 0 18px rgba(255,210,31,0.35)}}"
+        f"@keyframes iconMotion {{"
+        f"  0% {{ transform: scale(0.85) translateY(12px); opacity: 0; filter: drop-shadow(0 0 0px rgba(255,210,31,0)); }}"
+        f"  50% {{ transform: scale(1.06) translateY(-4px); opacity: 1; }}"
+        f"  100% {{ transform: scale(1.0) translateY(0); opacity: 1; filter: drop-shadow(0 12px 25px rgba(0,0,0,.75)) drop-shadow(0 0 24px rgba(255,210,31,.4)); }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
@@ -550,8 +551,8 @@ def sub_html(text, icon_override=None):
 def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
     word = cover_word(hook)
     accent = YELLOW
-    glow_a = "rgba(255,210,31,.22)"
-    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=320 + (cover_variant % 3) * 20)
+    glow_a = "rgba(255,210,31,.25)"
+    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=340 + (cover_variant % 3) * 20)
     layout_shift = (cover_variant % 4)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
@@ -560,16 +561,19 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
         f".bg-cinematic{{position:absolute;inset:0;background:{BACKGROUND_CSS};pointer-events:none;}}"
-        f".glow-orb{{position:absolute;width:800px;height:800px;top:32%;left:50%;transform:translate(-50%,-50%);background:{BACKGROUND_PATTERN};border-radius:50%;pointer-events:none;}}"
-        f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
+        f".glow-orb{{position:absolute;width:850px;height:850px;top:30%;left:50%;transform:translate(-50%,-50%);background:{BACKGROUND_PATTERN};border-radius:50%;pointer-events:none;}}"
+        f".visual{{width:540px;height:520px;display:flex;align-items:center;justify-content:center;z-index:2;"
         f"margin-top:-55px;position:relative}}"
-        f".cover-icon{{width:{320 + (cover_variant % 3)*20}px;height:{320 + (cover_variant % 3)*20}px;filter:drop-shadow(0 18px 30px rgba(0,0,0,.7)) drop-shadow(0 0 30px {glow_a});animation:float 4s ease-in-out infinite}}"
-        f".word{{z-index:2;color:{accent};font-weight:800;font-size:116px;line-height:1.42;max-width:920px;"
-        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 35px {glow_a};margin-top:{-4 + layout_shift*9}px}}"
+        f".cover-icon{{width:{340 + (cover_variant % 3)*20}px;height:{340 + (cover_variant % 3)*20}px;}}"
+        f".word{{z-index:2;color:{accent};font-weight:800;font-size:118px;line-height:1.42;max-width:920px;"
+        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 40px {glow_a};margin-top:{-4 + layout_shift*9}px}}"
         f".rule{{width:{110 + layout_shift*22}px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);margin-top:25px;z-index:2}}"
         f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{accent};font-family:{FONT};{FONT_RENDERING}"
-        f"font-size:35px;font-weight:700;letter-spacing:0;opacity:.95;text-shadow:0 0 16px {glow_a};z-index:2}}"
-        f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
+        f"font-size:35px;font-weight:700;letter-spacing:0;opacity:.95;text-shadow:0 0 18px {glow_a};z-index:2}}"
+        f"@keyframes iconMotion {{"
+        f"  0% {{ transform: scale(0.85) translateY(15px); opacity: 0; }}"
+        f"  100% {{ transform: scale(1) translateY(0); opacity: 1; }}"
+        f"}}"
         f"</style></head><body>"
         f"<div class='bg-cinematic'></div><div class='glow-orb'></div>"
         f"<div class='visual'>{cover_icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
@@ -588,8 +592,8 @@ def outro_html(mascot=False):
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
         f".slogan{{font-family:{FONT};{FONT_RENDERING}font-size:68px;font-weight:800;line-height:1.55;color:{YELLOW};"
-        f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 35px rgba(255,210,31,0.35)}}"
-        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:{YELLOW};line-height:1.6;letter-spacing:0;text-shadow:0 0 18px rgba(255,210,31,.25)}}"
+        f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 38px rgba(255,210,31,0.4)}}"
+        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:{YELLOW};line-height:1.6;letter-spacing:0;text-shadow:0 0 20px rgba(255,210,31,.3)}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -667,7 +671,7 @@ def assemble(clips, durs, voice_wav, music, out):
     if music:
         fc += (f"[{vi+1}:a]volume={MUSIC_VOLUME},afade=t=in:d=1,"
                f"afade=t=out:st={max(total-1.5,0):.3f}:d=1.5[m];"
-               f"[{vi}:a][m]amix=inputs=2:duration=first:normalize=0[mix];"
+               f"[{vi+1}:a][m]amix=inputs=2:duration=first:normalize=0[mix];"
                f"[mix]loudnorm=I=-16:TP=-1.5:LRA=11[aout]")
     else:
         fc += f"[{vi}:a]loudnorm=I=-16:TP=-1.5:LRA=11[aout]"
