@@ -21,6 +21,7 @@ import sys
 import tempfile
 import urllib.parse
 import urllib.request
+import unicodedata
 import edge_tts
 from pathlib import Path
 
@@ -42,7 +43,7 @@ VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 BACKGROUND = "#07080D"  # پایه‌ی یکسان برای کاور، صحنه‌ها و پایان ویدئو
 # دو سایه‌ی سینمایی بسیار ملایم؛ بدون تغییر ناگهانی رنگ بین کاور و بدنه
-BACKGROUND_CSS = "radial-gradient(ellipse at 18% 22%, rgba(22,38,58,.72) 0%, rgba(22,38,58,0) 48%), radial-gradient(ellipse at 82% 78%, rgba(62,37,24,.48) 0%, rgba(62,37,24,0) 52%), #07080D"
+BACKGROUND_CSS = "radial-gradient(ellipse at 12% 18%, rgba(0,170,190,.34) 0%, rgba(0,170,190,0) 48%), radial-gradient(ellipse at 88% 82%, rgba(190,91,35,.34) 0%, rgba(190,91,35,0) 50%), linear-gradient(135deg,#080D19 0%,#11101A 52%,#160E12 100%)"
 YELLOW = "#FFD21F"
 
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -215,6 +216,18 @@ def concat_wavs(paths, dst, d):
          "-c", "copy", str(dst)])
 
 
+def tts_safe_text(text):
+    """Remove pictographs/emoji before TTS while preserving Persian and Latin text."""
+    kept = []
+    for char in (text or ""):
+        category = unicodedata.category(char)
+        # Keep letters, numbers, marks and ordinary punctuation; discard emoji/symbols
+        # such as 😁 which Edge-TTS may reject with NoAudioReceived.
+        if category[0] in {"L", "N", "M", "P", "Z"}:
+            kept.append(char)
+    return re.sub(r"\s+", " ", "".join(kept)).strip()
+
+
 async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     wavs, timing, t = [], [], 0.0
     if lead > 0:
@@ -225,8 +238,13 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     for j, ch in enumerate(chunks):
         raw_audio = d / f"a{idx:02d}_{j:02d}_raw.wav"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
-        await tts(ch, raw_audio)
-        to_wav(raw_audio, wav, tail if j == len(chunks) - 1 else GAP)
+        spoken = tts_safe_text(ch)
+        if spoken:
+            await tts(spoken, raw_audio)
+            to_wav(raw_audio, wav, tail if j == len(chunks) - 1 else GAP)
+        else:
+            # Emoji-only chunks remain visible in subtitles but are not sent to TTS.
+            silence_wav(wav, tail if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
         timing.append((ch, t, t + dur))
         wavs.append(wav)
@@ -248,6 +266,22 @@ def icon_kind(text):
         # Dedicated technology and crypto symbols take priority over generic network/money rules.
         (("هوش مصنوعی", "هوش مصنوعی", "ai", "ربات", "ربات هوشمند", "مدل زبانی", "چت بات", "چتبات", "قرارداد هوشمند", "قرارداد", "اسمارت کانترکت", "smart contract", "smart contracts", "کانترکت", "contract", "contracts"), "robot"),
         (("بلاکچین", "بلاک چین", "ارز دیجیتال", "ارزدیجیتال", "کریپتو", "رمزارز", "رمز ارز", "بیت کوین", "بیتکوین", "bitcoin", "btc", "اتریوم", "اتریوم", "توکن", "کوین", "کیف پول دیجیتال"), "bitcoin"),
+        # Newly requested dedicated pictograms; longer/more specific terms are checked first.
+        (("چراغ راهنمایی", "چراغ قرمز", "چراغ سبز", "راهنمایی و رانندگی", "traffic light"), "traffic_light"),
+        (("تابلو دور زدن", "دور زدن", "یوترن", "u-turn", "u turn"), "u_turn"),
+        (("تابلو ایست", "علامت ایست", "ایست", "stop sign"), "stop_sign"),
+        (("ورق پول", "اسکناس", "برگ پول", "banknote", "bank note", "دلار نقد"), "banknote"),
+        (("هواپیما", "پرواز", "فرودگاه", "airplane", "aircraft"), "airplane"),
+        (("قطار", "ریل", "ایستگاه قطار", "train"), "train"),
+        (("جاده", "بزرگراه", "اتوبان", "مسیر جاده ای", "road"), "road"),
+        (("بلندگو", "اسپیکر", "صدای بلند", "speaker"), "speaker"),
+        (("موبایل", "گوشی همراه", "تلفن همراه", "smartphone", "mobile phone"), "mobile"),
+        (("موتور", "موتورسیکلت", "موتور سیکلت", "motorcycle", "motorbike"), "motorcycle"),
+        (("ساختمان", "برج", "آسمان خراش", "مجتمع", "building"), "building"),
+        (("دمبل", "وزنه", "بدنسازی", "تمرین قدرتی", "dumbbell"), "dumbbell"),
+        (("نقاب", "ماسک", "پوشش صورت", "mask"), "mask"),
+        (("گوش", "شنیدن", "شنوایی", "گوش دادن", "ear"), "ear"),
+        (("علامت خواب", "خواب آلود", "خواب آلودگی", "zzz", "نماد خواب"), "sleep_symbol"),
         # Dedicated figures and objects. Exact word boundaries avoid false matches
         # such as "زن" inside "زندگی" or "شیر" inside "شیرین".
         (("زن", "زنان", "زنانه", "زن ها", "خانم", "خانم ها", "دختر", "دختران", "بانوان"), "woman"),
@@ -282,7 +316,8 @@ def icon_kind(text):
         (("دست دادن", "مشارکت", "توافق", "همکاری نزدیک"), "handshake"),
         (("هشدار", "خطر", "ریسک", "احتیاط"), "warning"),
         (("ستاره", "درخشش", "ویژه", "ممتاز"), "star"),
-        (("ماشین", "خودرو", "رانندگی", "سفر جاده ای"), "car"),
+        (("ماشین", "خودرو", "رانندگی", "اتومبیل"), "car"),
+        (("جاده", "بزرگراه", "اتوبان"), "road"),
         (("مکان", "موقعیت", "آدرس", "لوکیشن"), "location"),
         # Five additional dedicated icons: contact, promotion, systems, leadership, and steps.
         (("پیگیری", "تماس", "تلفن", "فالوآپ", "دنبالکردن", "پاسخگویی", "تماسگیری"), "phone"),
@@ -326,7 +361,7 @@ def icon_kind(text):
 
 
 
-ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin', 'shop', 'tree')
+ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin', 'shop', 'tree', 'mask', 'ear', 'sleep_symbol', 'traffic_light', 'banknote', 'road', 'airplane', 'train', 'u_turn', 'stop_sign', 'speaker', 'mobile', 'motorcycle', 'building', 'dumbbell')
 ICON_ALTERNATES = {
  "brain": ("book", "bulb", "eye", "puzzle", "network"),
  "target": ("compass", "flag", "mountain", "star", "growth"),
@@ -339,7 +374,11 @@ ICON_ALTERNATES = {
  "money": ("bitcoin", "growth", "shop", "crown", "scales"),
  "robot": ("network", "brain", "gear", "bulb", "shield"),
  "bitcoin": ("money", "network", "growth", "scales", "lock"),
- "sleep": ("bed", "moon", "calendar", "home", "time"),
+ "sleep": ("sleep_symbol", "bed", "moon", "calendar", "home", "time"),
+ "car": ("road", "traffic_light", "u_turn", "stop_sign", "motorcycle"),
+ "money": ("banknote", "bitcoin", "growth", "shop", "scales"),
+ "phone": ("mobile", "speaker", "chat", "network"),
+ "people": ("mask", "ear", "woman", "man", "handshake"),
 }
 
 def assign_unique_icon_kinds(texts, reserved=()):
@@ -413,6 +452,22 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         "warning": "<path d='M60 12 110 104H10Z'/><path d='M60 42v29'/><circle cx='60' cy='86' r='4' fill='currentColor'/>",
         "star": "<path d='m60 10 15 32 35 5-25 24 6 36-31-17-31 17 6-36L10 47l35-5Z'/>",
         "car": "<path d='m18 70 10-30h64l10 30v25H18Z'/><path d='M28 40 40 20h40l12 20M18 70h84M32 95v10M88 95v10'/><circle cx='34' cy='75' r='7'/><circle cx='86' cy='75' r='7'/>",
+        # New precision pictograms: centered geometry, consistent stroke rhythm and balanced negative space.
+        "mask": "<path d='M18 38Q60 8 102 38v28Q60 108 18 66Z'/><path d='M28 51q14-12 28 0M64 51q14-12 28 0M35 72q25 17 50 0'/><path d='M18 42 9 35M102 42l9-7' />",
+        "ear": "<path d='M31 61V48c0-21 13-35 31-35s31 14 31 34c0 17-10 23-19 32-6 6-7 15-15 20-11 7-24-1-24-13'/><path d='M48 51c0-9 6-15 14-15s14 6 14 14c0 9-7 13-13 19-4 4-4 10-9 13'/><path d='M42 91q-2 12 9 16' />",
+        "sleep_symbol": "<path d='M18 28h34L18 61h35M65 16h37L65 53h37M48 76h55L48 111h55'/><path d='m20 12 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z'/> ",
+        "traffic_light": "<rect x='37' y='10' width='46' height='91' rx='12'/><circle cx='60' cy='31' r='10'/><circle cx='60' cy='56' r='10'/><circle cx='60' cy='81' r='10'/><path d='M60 101v10M48 111h24'/>",
+        "banknote": "<rect x='10' y='27' width='100' height='66' rx='8'/><path d='M22 27q0 14-12 14M98 27q0 14 12 14M22 93q0-14-12-14M98 93q0-14 12-14'/><circle cx='60' cy='60' r='19'/><path d='M66 48c-12-8-22 5-10 11 13 6 3 20-10 11M60 43v34'/>",
+        "road": "<path d='M37 110 49 10M83 110 71 10'/><path d='M60 16v17M60 48v18M60 83v18'/><path d='M37 110h46'/>",
+        "airplane": "<path d='M60 8 70 51l38 21v12L69 73l-3 27 12 9v6l-18-6-18 6v-6l12-9-3-27-39 11V72l38-21Z'/><path d='M49 49h22'/>",
+        "train": "<rect x='25' y='12' width='70' height='86' rx='16'/><path d='M25 62h70M39 28h16v19H39ZM65 28h16v19H65ZM39 98l-10 13M81 98l10 13M39 82h42'/><circle cx='42' cy='70' r='4'/><circle cx='78' cy='70' r='4'/>",
+        "u_turn": "<path d='M38 106V48c0-17 10-27 25-27s25 10 25 27v12'/><path d='m70 49 18 18 18-18'/><path d='M38 78h25'/>",
+        "stop_sign": "<path d='m39 10 42 0 29 29v42l-29 29H39L10 81V39Z'/><path d='M34 48h52v24H34Z'/><path d='M43 60h34'/>",
+        "speaker": "<path d='M14 46h23l42-25v78L37 74H14Z'/><path d='M37 74 46 105h18L55 84'/><path d='M91 43q18 17 0 34M100 31q29 29 0 58'/>",
+        "mobile": "<rect x='31' y='9' width='58' height='102' rx='11'/><path d='M45 21h30M53 96h14'/><circle cx='60' cy='84' r='3'/>",
+        "motorcycle": "<circle cx='28' cy='86' r='18'/><circle cx='94' cy='86' r='18'/><path d='m28 86 23-34h22l21 34H60L48 65M51 52h-9M72 52l10-12h12M60 86l-9-34'/><path d='M78 36h15'/>",
+        "building": "<path d='M18 108V20h84v88M18 42h84M18 64h84M18 86h84'/><path d='M31 30h8M53 30h8M75 30h8M31 52h8M53 52h8M75 52h8M31 74h8M53 74h8M75 74h8M49 108V91h22v17'/>",
+        "dumbbell": "<path d='M12 43v34M25 32v56M25 60h70M95 32v56M108 43v34'/><path d='M12 60h13M95 60h13'/>",
         "location": "<path d='M60 110S22 68 22 46a38 38 0 1 1 76 0c0 22-38 64-38 64Z'/><circle cx='60' cy='46' r='13'/>",
     }
     if kind not in paths:
@@ -420,7 +475,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:{"drop-shadow(0 7px 4px rgba(0,0,0,.48)) drop-shadow(0 0 15px rgba(0,210,255,.30))" if kind == "robot" else "drop-shadow(0 7px 4px rgba(0,0,0,.48)) drop-shadow(0 0 15px rgba(255,176,32,.30))" if kind == "bitcoin" else "drop-shadow(0 5px 2px rgba(255,255,255,.16)) drop-shadow(0 0 12px rgba(255,255,255,.12))"}'>"
+            f"style='filter:{"drop-shadow(0 9px 5px rgba(0,0,0,.58)) drop-shadow(0 0 17px rgba(0,210,255,.34))" if kind in ("robot", "mobile", "speaker", "traffic_light") else "drop-shadow(0 9px 5px rgba(0,0,0,.58)) drop-shadow(0 0 17px rgba(255,176,32,.34))" if kind in ("bitcoin", "banknote", "money") else "drop-shadow(0 8px 5px rgba(0,0,0,.58)) drop-shadow(0 0 14px rgba(120,190,255,.22))"}'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
@@ -531,27 +586,35 @@ def brand_logo_svg(size=112):
     )
 
 
-def cover_html(hook, tag=None, mascot=False, cover_image=None):
+def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
     """Icon-only cover matching the reel background; body scenes continue using the same vector icon system."""
     word = cover_word(hook)
-    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=330)
+    palettes = [("#FFD21F", "rgba(0,210,255,.22)", "rgba(255,132,45,.20)"),
+                ("#63E6D2", "rgba(99,230,210,.24)", "rgba(255,92,120,.20)"),
+                ("#FFB86B", "rgba(255,184,107,.24)", "rgba(92,142,255,.22)"),
+                ("#B9A2FF", "rgba(185,162,255,.24)", "rgba(255,190,92,.20)"),
+                ("#F4F4F4", "rgba(75,190,255,.23)", "rgba(255,105,105,.20)"),
+                ("#FF8FB1", "rgba(255,143,177,.23)", "rgba(83,190,255,.22)")]
+    accent, glow_a, glow_b = palettes[cover_variant % len(palettes)]
+    cover_icon = icon_svg(hook + " " + word, color=accent, size=300 + (cover_variant % 3) * 22)
+    layout_shift = (cover_variant % 4)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:radial-gradient(ellipse at {15 + (cover_variant*13)%70}% {18 + (cover_variant*17)%65}%,{glow_a},transparent 48%),radial-gradient(ellipse at {85 - (cover_variant*11)%65}% {80 - (cover_variant*9)%55}%,{glow_b},transparent 50%),{BACKGROUND_CSS}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
         f".grain{{position:absolute;inset:0;background:transparent;pointer-events:none}}"
         f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
         f"margin-top:-55px;position:relative}}"
-        f".visual:before{{content:'';position:absolute;width:460px;height:460px;border-radius:50%;"
-        f"border:1px solid rgba(255,210,31,.14);box-shadow:0 0 65px rgba(255,210,31,.055),inset 0 0 48px rgba(255,210,31,.035)}}"
-        f".cover-icon{{width:330px;height:330px;filter:drop-shadow(0 14px 30px rgba(255,210,31,.25));animation:float 4s ease-in-out infinite}}"
-        f".word{{z-index:2;color:#FFD21F;font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
-        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px rgba(255,210,31,.16);margin-top:-4px}}"
-        f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,#FFD21F,transparent);margin-top:25px}}"
-        f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{YELLOW};font-family:{FONT};{FONT_RENDERING}"
-        f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px rgba(255,210,31,.22);z-index:2}}"
+        f".visual:before{{content:'';position:absolute;width:{420 + layout_shift*24}px;height:{420 + layout_shift*24}px;border-radius:{'50%' if layout_shift % 2 == 0 else '34%'};"
+        f"border:1px solid {glow_a};box-shadow:0 0 75px {glow_a},inset 0 0 54px {glow_b}}}"
+        f".cover-icon{{width:{300 + (cover_variant % 3)*22}px;height:{300 + (cover_variant % 3)*22}px;filter:drop-shadow(0 16px 28px rgba(0,0,0,.55)) drop-shadow(0 0 26px {glow_a});animation:float 4s ease-in-out infinite}}"
+        f".word{{z-index:2;color:{accent};font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
+        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px {glow_a};margin-top:{-4 + layout_shift*9}px}}"
+        f".rule{{width:{110 + layout_shift*22}px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);margin-top:25px}}"
+        f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{accent};font-family:{FONT};{FONT_RENDERING}"
+        f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px {glow_a};z-index:2}}"
         f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
         f"</style></head><body><div class='grain'></div>"
         f"<div class='visual'>{cover_icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
@@ -681,7 +744,28 @@ async def build(hook, scenes, d, dst, tag=None):
     all_texts = [txt for sh in shots for txt in sh["chunks"]]
     assigned_kinds = iter(assign_unique_icon_kinds(all_texts, reserved=(cover_kind,)))
     cover_png = d / "cover.png"
-    jobs.append((cover_html(hook), cover_png, False))
+    history_dir = dst.parent / ".cover_history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    known_hashes = set()
+    for old_cover in history_dir.glob("*.png"):
+        try:
+            known_hashes.add(hashlib.sha256(old_cover.read_bytes()).hexdigest())
+        except OSError:
+            pass
+    # Randomized composition/color variants are regenerated if an exact duplicate exists.
+    cover_variant = random.SystemRandom().randrange(0, 6)
+    for attempt in range(24):
+        candidate_variant = (cover_variant + attempt) % 24
+        candidate_html = cover_html(hook, cover_variant=candidate_variant)
+        render_pages([(candidate_html, cover_png, False)])
+        candidate_hash = hashlib.sha256(cover_png.read_bytes()).hexdigest()
+        if candidate_hash not in known_hashes:
+            cover_variant = candidate_variant
+            break
+    else:
+        raise RuntimeError("Could not create a unique cover after 24 design variations.")
+    archive_name = f"{hashlib.sha256((hook + str(random.random())).encode('utf-8')).hexdigest()[:16]}.png"
+    (history_dir / archive_name).write_bytes(cover_png.read_bytes())
     bg_pngs.append(cover_png)
     sub_pngs.append([])
     
