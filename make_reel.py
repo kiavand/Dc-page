@@ -1,4 +1,4 @@
-"""Persian Reel builder v4.3 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
+"""Persian Reel builder v4.4 (Ultra-Professional Cinematic Matte Dark & Precision Alignment).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
@@ -25,7 +25,6 @@ import unicodedata
 import edge_tts
 from pathlib import Path
 
-# Shared User-Agent used by bot.py for reliable Telegram/API requests.
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 
@@ -41,18 +40,14 @@ MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
-BACKGROUND = "#102832"  # هویت ثابت: دو رنگ لوکس و متضاد، عمیق و غیرشاد
-# دو پنل موربِ برجسته: سبزآبی نفتی در کنار آلویی/زرشکی تیره؛ نور از بالا و سایه در محل اتصال
+
+# پالت رنگی حرفه‌ای: مشکی کربنی لوکس با گرادیانت کهکشانی بسیار عمیق برای حداکثر خوانایی و جلوه پرمیوم
+BACKGROUND = "#030305"
 BACKGROUND_CSS = (
-    "radial-gradient(ellipse at 18% 12%,rgba(116,159,164,.22) 0%,transparent 42%),"
-    "radial-gradient(ellipse at 84% 88%,rgba(151,91,111,.20) 0%,transparent 44%),"
-    "linear-gradient(112deg,#173943 0%,#102832 48.8%,#342633 51.2%,#241C29 100%)"
+    "radial-gradient(circle at 50% 32%, rgba(35,35,55,0.65) 0%, rgba(8,8,12,0.95) 55%, #030305 100%)"
 )
 BACKGROUND_PATTERN = (
-    "linear-gradient(112deg,transparent 0%,rgba(255,255,255,.055) 49.7%,"
-    "rgba(0,0,0,.34) 50%,transparent 50.5%),"
-    "repeating-linear-gradient(135deg,rgba(255,255,255,.014) 0px,"
-    "rgba(255,255,255,.014) 1px,transparent 1px,transparent 38px)"
+    "radial-gradient(circle at 50% 32%, rgba(255,210,31,0.06) 0%, transparent 65%)"
 )
 YELLOW = "#FFD21F"
 
@@ -154,11 +149,6 @@ def split_chunks(text, max_chars=72):
 
 # ---------------------------------------------------------------- Edge-TTS
 async def tts(text, out_wav, retries=4):
-    """Generate speech robustly; Edge-TTS occasionally returns an empty stream.
-
-    Keep the configured voice (Farid) unchanged. Retry transient network/service
-    failures with backoff, and never let a zero-byte/partial audio file pass on.
-    """
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
@@ -167,10 +157,9 @@ async def tts(text, out_wav, retries=4):
     last_error = None
     for attempt in range(retries):
         try:
-            # Remove partial output left by a failed stream before retrying.
             try:
                 out_wav.unlink(missing_ok=True)
-            except TypeError:  # Python compatibility fallback
+            except TypeError:
                 if out_wav.exists():
                     out_wav.unlink()
 
@@ -227,12 +216,9 @@ def concat_wavs(paths, dst, d):
 
 
 def tts_safe_text(text):
-    """Remove pictographs/emoji before TTS while preserving Persian and Latin text."""
     kept = []
     for char in (text or ""):
         category = unicodedata.category(char)
-        # Keep letters, numbers, marks and ordinary punctuation; discard emoji/symbols
-        # such as 😁 which Edge-TTS may reject with NoAudioReceived.
         if category[0] in {"L", "N", "M", "P", "Z"}:
             kept.append(char)
     return re.sub(r"\s+", " ", "".join(kept)).strip()
@@ -253,7 +239,6 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
             await tts(spoken, raw_audio)
             to_wav(raw_audio, wav, tail if j == len(chunks) - 1 else GAP)
         else:
-            # Emoji-only chunks remain visible in subtitles but are not sent to TTS.
             silence_wav(wav, tail if j == len(chunks) - 1 else GAP)
         dur = duration(wav)
         timing.append((ch, t, t + dur))
@@ -269,46 +254,41 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
     return scene_wav, timing, duration(scene_wav)
 
 
-# ---------------------------------------------------------------- smart icons mapping (High-End Vector Precision)
 def icon_kind(text):
     t = norm(text).lower()
     specific_rules = [
-        # Dedicated technology and crypto symbols take priority over generic network/money rules.
-        (("هوش مصنوعی", "هوش مصنوعی", "ai", "ربات", "ربات هوشمند", "مدل زبانی", "چت بات", "چتبات", "قرارداد هوشمند", "قرارداد", "اسمارت کانترکت", "smart contract", "smart contracts", "کانترکت", "contract", "contracts"), "robot"),
-        (("بلاکچین", "بلاک چین", "ارز دیجیتال", "ارزدیجیتال", "کریپتو", "رمزارز", "رمز ارز", "بیت کوین", "بیتکوین", "bitcoin", "btc", "اتریوم", "اتریوم", "توکن", "کوین", "کیف پول دیجیتال"), "bitcoin"),
-        # Newly requested dedicated pictograms; longer/more specific terms are checked first.
-        (("چراغ راهنمایی", "چراغ قرمز", "چراغ سبز", "راهنمایی و رانندگی", "traffic light"), "traffic_light"),
-        (("تابلو دور زدن", "دور زدن", "یوترن", "u-turn", "u turn"), "u_turn"),
-        (("تابلو ایست", "علامت ایست", "ایست", "stop sign"), "stop_sign"),
-        (("ورق پول", "اسکناس", "برگ پول", "banknote", "bank note", "دلار نقد"), "banknote"),
-        (("هواپیما", "پرواز", "فرودگاه", "airplane", "aircraft"), "airplane"),
-        (("قطار", "ریل", "ایستگاه قطار", "train"), "train"),
-        (("جاده", "بزرگراه", "اتوبان", "مسیر جاده ای", "road"), "road"),
-        (("بلندگو", "اسپیکر", "صدای بلند", "speaker"), "speaker"),
-        (("موبایل", "گوشی همراه", "تلفن همراه", "smartphone", "mobile phone"), "mobile"),
-        (("موتور", "موتورسیکلت", "موتور سیکلت", "motorcycle", "motorbike"), "motorcycle"),
-        (("ساختمان", "برج", "آسمان خراش", "مجتمع", "building"), "building"),
-        (("دمبل", "وزنه", "بدنسازی", "تمرین قدرتی", "dumbbell"), "dumbbell"),
-        (("نقاب", "ماسک", "پوشش صورت", "mask"), "mask"),
-        (("گوش", "شنیدن", "شنوایی", "گوش دادن", "ear"), "ear"),
-        (("علامت خواب", "خواب آلود", "خواب آلودگی", "zzz", "نماد خواب"), "sleep_symbol"),
-        # Dedicated figures and objects. Exact word boundaries avoid false matches
-        # such as "زن" inside "زندگی" or "شیر" inside "شیرین".
-        (("زن", "زنان", "زنانه", "زن ها", "خانم", "خانم ها", "دختر", "دختران", "بانوان"), "woman"),
-        (("مرد", "مردان", "مردها", "مردانه", "آقا", "آقایان", "پسر", "پسران"), "man"),
-        (("ماهانه", "ماه شمسی", "ماه میلادی", "تقویم", "مهلت", "زمانبندی", "برنامهریزی"), "calendar"),
-        (("خورشید", "آفتاب", "طلوع", "غروب خورشید", "روز آفتابی"), "sun"),
-        (("ماه کامل", "مهتاب", "ماه شب", "هلال ماه", "ماه", "ماه ها"), "moon"),
-        (("تخت خواب", "تختخواب", "تخت", "اتاق خواب", "خوابگاه"), "bed"),
-        (("خواب", "خوابیدن", "بیدارشدن", "بیخوابی", "بی خوابی", "استراحت شبانه", "چرت"), "sleep"),
-        (("ابزار", "جعبه ابزار", "آچار", "چکش", "پیچگوشتی", "تعمیرکاری"), "tools"),
-        (("سیگار", "سیگاری", "دود سیگار", "فندک", "تنباکو"), "cigarette"),
-        (("پرنده", "پرندگان", "کبوتر", "عقاب", "جوجه", "بال پرواز"), "bird"),
-        (("شیر جنگل", "شیر نر", "شیر ماده", "شیر", "شیرها"), "lion"),
-        (("روباه", "روباه ها", "روباه صفت"), "fox"),
-        (("گرگ", "گرگها", "گرگ ها", "گرگینه"), "wolf"),
-        (("گوسفند", "گوسفندها", "میش", "بره", "دام گوسفندی"), "sheep"),
-        (("گاو", "گاوها", "گوساله", "گاو نر", "گاو ماده"), "cow"),
+        (("هوش مصنوعی", "ai", "ربات", "مدل زبانی", "چت بات", "چتبات", "اسمارت کانترکت", "smart contract"), "robot"),
+        (("بلاکچین", "بلاک چین", "ارز دیجیتال", "کریپتو", "رمزارز", "بیت کوین", "بیتکوین", "bitcoin", "btc", "اتریوم", "توکن", "کوین"), "bitcoin"),
+        (("چراغ راهنمایی", "چراغ قرمز", "راهنمایی و رانندگی", "traffic light"), "traffic_light"),
+        (("دور زدن", "یوترن", "u-turn"), "u_turn"),
+        (("علامت ایست", "ایست", "stop sign"), "stop_sign"),
+        (("اسکناس", "برگ پول", "banknote", "دلار نقد"), "banknote"),
+        (("هواپیما", "پرواز", "فرودگاه", "airplane"), "airplane"),
+        (("قطار", "ریل", "train"), "train"),
+        (("جاده", "بزرگراه", "اتوبان", "road"), "road"),
+        (("بلندگو", "اسپیکر", "speaker"), "speaker"),
+        (("موبایل", "گوشی همراه", "تلفن همراه", "smartphone", "mobile"), "mobile"),
+        (("موتور", "موتورسیکلت", "motorcycle"), "motorcycle"),
+        (("ساختمان", "برج", "آسمان خراش", "building"), "building"),
+        (("دمبل", "وزنه", "بدنسازی", "dumbbell"), "dumbbell"),
+        (("نقاب", "ماسک", "mask"), "mask"),
+        (("گوش", "شنیدن", "شنوایی", "ear"), "ear"),
+        (("خواب آلود", "zzz", "نماد خواب"), "sleep_symbol"),
+        (("زن", "زنان", "خانم", "دختر", "بانوان"), "woman"),
+        (("مرد", "مردان", "آقا", "پسر"), "man"),
+        (("تقویم", "ماهانه", "برنامهریزی"), "calendar"),
+        (("خورشید", "آفتاب", "طلوع", "غروب"), "sun"),
+        (("ماه", "مهتاب", "هلال ماه"), "moon"),
+        (("تخت خواب", "تختخواب", "تخت", "اتاق خواب"), "bed"),
+        (("خواب", "خوابیدن", "بیخوابی", "استراحت"), "sleep"),
+        (("ابزار", "آچار", "چکش", "پیچگوشتی"), "tools"),
+        (("سیگار", "تنباکو"), "cigarette"),
+        (("پرنده", "کبوتر", "عقاب", "بال پرواز"), "bird"),
+        (("شیر", "شیر جنگل"), "lion"),
+        (("روباه"), "fox"),
+        (("گرگ"), "wolf"),
+        (("گوسفند", "بره"), "sheep"),
+        (("گاو"), "cow"),
     ]
     for words, kind in specific_rules:
         for word in words:
@@ -321,55 +301,46 @@ def icon_kind(text):
                 return kind
 
     rules = [
-
-        (("خانه", "خانه داری", "مسکن", "منزل"), "home"),
-        (("دست دادن", "مشارکت", "توافق", "همکاری نزدیک"), "handshake"),
+        (("خانه", "مسکن", "منزل"), "home"),
+        (("دست دادن", "توافق", "همکاری"), "handshake"),
         (("هشدار", "خطر", "ریسک", "احتیاط"), "warning"),
-        (("ستاره", "درخشش", "ویژه", "ممتاز"), "star"),
-        (("ماشین", "خودرو", "رانندگی", "اتومبیل"), "car"),
-        (("جاده", "بزرگراه", "اتوبان"), "road"),
-        (("مکان", "موقعیت", "آدرس", "لوکیشن"), "location"),
-        # Five additional dedicated icons: contact, promotion, systems, leadership, and steps.
-        (("پیگیری", "تماس", "تلفن", "فالوآپ", "دنبالکردن", "پاسخگویی", "تماسگیری"), "phone"),
-        (("تبلیغ", "بازاریابی", "محتواسازی", "معرفی محصول", "کمپین", "جذبمخاطب", "تبلیغات"), "megaphone"),
-        (("سیستم سازی", "سیستم‌سازی", "فرایند", "فرآیند", "اتوماسیون", "روال", "workflow", "گردشکار"), "gear"),
-        (("رهبری", "رهبر", "مدیر", "مدیریت", "نفوذ", "اثرگذاری", "هدایت"), "crown"),
-        (("قدم", "گام", "مرحله", "مراحل", "پله", "گامبهگام", "قدمبهقدم"), "stairs"),
-        (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری", "تصمیمگیری"), "brain"),
-        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "کیفپول", "اقتصاد", "فروش", "قیمت", "بازار", "معامله", "سود", "ضرر", "ریسک"), "money"),
-        (("هدف", "موفقیت", "برنامه", "مسیر", "تصمیم", "شروع", "نتیجه", "اولویت"), "target"),
-        (("رشد", "پیشرفت", "افزایش", "آمار", "نمودار", "توسعه", "تغییر", "بهبود", "ساختن"), "growth"),
-        (("کتاب", "یادگیری", "آموزش", "دانش", "مطالعه", "مهارت", "درس", "تجربه"), "book"),
-        (("عشق", "رابطه", "خانواده", "دوستی", "اعتماد", "احترام", "گفتگو", "گفتوگو", "زبانبدن", "مذاکره", "قرارداد", "ارتباط"), "heart"),
-        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "انضباط", "تعهد", "روزانه", "تکرار"), "time"),
-        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "پرسش", "مشکل", "اشتباه", "راهحل", "چالش"), "question"),
-        (("بلاکچین", "کریپتو", "ارزدیجیتال", "تکنولوژی", "فناوری", "شبکه", "اینترنت", "هوشمصنوعی", "ربات", "سیستم"), "network"),
-        (("تیم", "رهبری", "همکاری", "نتورک", "گروه", "مدیریت", "مربی", "جلسه", "تیمسازی"), "people"),
-        (("ترس", "نگرانی", "اضطراب", "فشار", "استرس", "شکست", "اعتمادبهنفس", "انگیزه", "امید"), "heart"),
-        (("سلامت", "ورزش", "بدن", "انرژی", "خواب", "تغذیه", "قدرت"), "growth"),
-        (("ایده", "خلاقیت", "الهام", "راهکار"), "bulb"),
-        (("امنیت", "محافظت", "حریم"), "shield"),
-        (("پیام", "محتوا", "گفتگو", "صحبت"), "chat"),
-        (("پیروزی", "جایزه", "قهرمان", "دستاورد"), "trophy"),
-        (("انتخاب", "جهت", "قطب"), "compass"),
-        (("قانون", "تعادل", "عدالت", "منصفانه"), "scales"),
-        (("توافق", "مشارکت", "دستدادن"), "handshake"),
-        (("برق", "سریع", "شتاب", "فوری", "قدرت"), "lightning"),
-        (("چشم", "دیدن", "مشاهده", "توجه", "آگاهی"), "eye"),
-        (("قفل", "امنیت", "حفاظت", "محرمانه"), "lock"),
-        (("قله", "مسیر سخت", "صعود", "بلندپروازی"), "mountain"),
-        (("پرچم", "پیشرو", "رکورد", "رقابت"), "flag"),
-        (("پیچیده", "ترکیب", "حل مسئله", "راهحل"), "puzzle"),
+        (("ستاره", "درخشش", "ویژه"), "star"),
+        (("ماشین", "خودرو", "رانندگی"), "car"),
+        (("پیگیری", "تماس", "تلفن", "فالوآپ"), "phone"),
+        (("تبلیغ", "بازاریابی", "محتواسازی", "کمپین"), "megaphone"),
+        (("سیستم سازی", "فرایند", "اتوماسیون", "روال"), "gear"),
+        (("رهبری", "رهبر", "مدیر", "مدیریت", "اثرگذاری"), "crown"),
+        (("قدم", "گام", "مرحله", "پله"), "stairs"),
+        (("ذهن", "فکر", "تمرکز", "هوش", "مغز", "یادگیری"), "brain"),
+        (("پول", "ثروت", "درآمد", "مالی", "سرمایه", "فروش", "قیمت", "سود"), "money"),
+        (("هدف", "موفقیت", "مسیر", "شروع", "نتیجه"), "target"),
+        (("رشد", "پیشرفت", "نمودار", "توسعه", "بهبود", "ساختن"), "growth"),
+        (("کتاب", "آموزش", "دانش", "مطالعه", "مهارت"), "book"),
+        (("عشق", "رابطه", "خانواده", "اعتماد", "مذاکره", "ارتباط"), "heart"),
+        (("زمان", "استمرار", "عادت", "صبر", "پشتکار", "تلاش", "تعهد"), "time"),
+        (("سؤال", "سوال", "چرا", "چطور", "چگونه", "مشکل", "چالش"), "question"),
+        (("تکنولوژی", "فناوری", "شبکه", "اینترنت", "سیستم"), "network"),
+        (("تیم", "گروه", "تیمسازی"), "people"),
+        (("ترس", "استرس", "شکست", "انگیزه", "امید"), "heart"),
+        (("سلامت", "ورزش", "انرژی", "قدرت"), "growth"),
+        (("ایده", "خلاقیت", "راهکار"), "bulb"),
+        (("امنیت", "محافظت"), "shield"),
+        (("پیام", "محتوا", "گفتگو"), "chat"),
+        (("پیروزی", "جایزه", "دستاورد"), "trophy"),
+        (("انتخاب", "قطب"), "compass"),
+        (("قانون", "عدالت"), "scales"),
+        (("برق", "سریع", "شتاب"), "lightning"),
+        (("چشم", "آگاهی"), "eye"),
+        (("قفل", "محرمانه"), "lock"),
+        (("قله", "صعود"), "mountain"),
+        (("پرچم", "رکورد"), "flag"),
+        (("پیچیده", "حل مسئله"), "puzzle"),
     ]
     for words, kind in rules:
         if any(norm(w) in t for w in words):
             return kind
-    # Unknown topics should not all collapse to the same star/spark icon.
-    # Pick a stable, varied fallback from the available semantic shapes.
     choices = ("target", "brain", "network", "book", "people", "growth", "question", "time", "heart", "money")
     return choices[int(hashlib.sha256(t.encode("utf-8")).hexdigest()[:8], 16) % len(choices)]
-
-
 
 ICON_LIBRARY = ('brain', 'money', 'target', 'growth', 'book', 'heart', 'time', 'question', 'network', 'people', 'spark', 'bulb', 'shield', 'chat', 'trophy', 'compass', 'scales', 'calendar', 'handshake', 'lightning', 'flag', 'mountain', 'lock', 'eye', 'puzzle', 'woman', 'man', 'sun', 'moon', 'sleep', 'tools', 'bed', 'cigarette', 'bird', 'lion', 'fox', 'wolf', 'sheep', 'cow', 'phone', 'megaphone', 'gear', 'crown', 'stairs', 'home', 'partnership', 'warning', 'star', 'car', 'location', 'robot', 'bitcoin', 'shop', 'tree', 'mask', 'ear', 'sleep_symbol', 'traffic_light', 'banknote', 'road', 'airplane', 'train', 'u_turn', 'stop_sign', 'speaker', 'mobile', 'motorcycle', 'building', 'dumbbell')
 ICON_ALTERNATES = {
@@ -386,31 +357,27 @@ ICON_ALTERNATES = {
  "bitcoin": ("money", "network", "growth", "scales", "lock"),
  "sleep": ("sleep_symbol", "bed", "moon", "calendar", "home", "time"),
  "car": ("road", "traffic_light", "u_turn", "stop_sign", "motorcycle"),
- "money": ("banknote", "bitcoin", "growth", "shop", "scales"),
  "phone": ("mobile", "speaker", "chat", "network"),
- "people": ("mask", "ear", "woman", "man", "handshake"),
 }
 
 def assign_unique_icon_kinds(texts, reserved=()):
-    used=set(reserved); result=[]
+    used = set(reserved); result = []
     for text in texts:
-        preferred=icon_kind(text)
-        candidates=[preferred, *ICON_ALTERNATES.get(preferred, ())]
+        preferred = icon_kind(text)
+        candidates = [preferred, *ICON_ALTERNATES.get(preferred, ())]
         candidates += [k for k in ICON_LIBRARY if k not in candidates]
-        chosen=next((k for k in candidates if k not in used), None)
+        chosen = next((k for k in candidates if k not in used), None)
         if chosen is None:
-            chosen=next((k for k in candidates if not result or k != result[-1]), preferred)
+            chosen = next((k for k in candidates if not result or k != result[-1]), preferred)
         result.append(chosen); used.add(chosen)
     return result
 
 def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
-    """Inline, dependency-free vector icons selected from the scene topic."""
     kind = kind_override or icon_kind(text)
     paths = {
-        # Purpose-built, optically balanced symbols: symmetric robot + Bitcoin coin.
         "robot": "<path d='M60 10v12M54 10h12'/><rect x='24' y='31' width='72' height='58' rx='18'/><path d='M24 49H13v23h11M96 49h11v23H96M39 89v12M81 89v12M45 101h30M39 54h10M71 54h10'/><rect x='43' y='43' width='34' height='23' rx='7'/><circle cx='51' cy='54' r='3' fill='currentColor'/><circle cx='69' cy='54' r='3' fill='currentColor'/><path d='M49 76h22M60 22v9'/>",
         "bitcoin": "<circle cx='60' cy='60' r='49'/><circle cx='60' cy='60' r='40'/><path d='M49 27v66M68 27v66M42 37h25c19 0 22 23 4 26 22 2 20 29 0 29H42M42 37h29M42 89h29'/><path d='M43 18v8M77 18v8M43 94v8M77 94v8'/>",
-        "shop": "<path d='M18 48h84v57H18Z'/><path d='m13 48 10-27h74l10 27M13 48c0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0'/><path d='M38 105V72h24v33M74 69h16v16H74Z'/>",
+        "shop": "<path d='M18 48h84v57H18Z'/><path d='m13 48 10-27h74l10 27M13 48c0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0'/><path d='M38 105V72h24v33M74 69h16v16H74Z'/>",
         "tree": "<path d='M60 12 27 52h18L22 78h29v29h18V78h29L75 52h18Z'/><path d='M60 82v25'/>",
         "brain": "<path d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
         "money": "<rect x='18' y='30' width='84' height='56' rx='9'/><path d='M18 42h84M78 54h24v22H78a11 11 0 0 1 0-22Z'/><circle cx='83' cy='65' r='3'/>",
@@ -456,13 +423,11 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
         "gear": "<path d='M52 10h16l4 13 10 4 11-7 12 12-7 11 4 10 13 4v16l-13 4-4 10 7 11-12 12-11-7-10 4-4 13H52l-4-13-10-4-11 7-12-12 7-11-4-10-13-4V54l13-4 4-10-7-11 12-12 11 7 10-4Z'/><circle cx='60' cy='62' r='19'/>",
         "crown": "<path d='m14 36 25 19 21-34 21 34 25-19-10 61H24Z'/><path d='M24 84h72M24 97h72'/><circle cx='14' cy='31' r='6'/><circle cx='60' cy='17' r='6'/><circle cx='106' cy='31' r='6'/>",
         "stairs": "<path d='M15 100V80h22V60h22V40h22V20h24'/><path d='M78 20h27v27M105 20 70 55'/><path d='M15 109h90'/>",
-
         "home": "<path d='m10 55 50-42 50 42M22 48v58h76V48M48 106V70h24v36'/>",
         "partnership": "<path d='m12 45 22-22 26 14 26-14 22 22-20 36-20-8-20 8Z'/><path d='m34 23 18 22 15-8 19 8M40 67l13 13M55 59l17 17M70 55l15 14'/>",
         "warning": "<path d='M60 12 110 104H10Z'/><path d='M60 42v29'/><circle cx='60' cy='86' r='4' fill='currentColor'/>",
         "star": "<path d='m60 10 15 32 35 5-25 24 6 36-31-17-31 17 6-36L10 47l35-5Z'/>",
         "car": "<path d='m18 70 10-30h64l10 30v25H18Z'/><path d='M28 40 40 20h40l12 20M18 70h84M32 95v10M88 95v10'/><circle cx='34' cy='75' r='7'/><circle cx='86' cy='75' r='7'/>",
-        # New precision pictograms: centered geometry, consistent stroke rhythm and balanced negative space.
         "mask": "<path d='M18 38Q60 8 102 38v28Q60 108 18 66Z'/><path d='M28 51q14-12 28 0M64 51q14-12 28 0M35 72q25 17 50 0'/><path d='M18 42 9 35M102 42l9-7' />",
         "ear": "<path d='M31 61V48c0-21 13-35 31-35s31 14 31 34c0 17-10 23-19 32-6 6-7 15-15 20-11 7-24-1-24-13'/><path d='M48 51c0-9 6-15 14-15s14 6 14 14c0 9-7 13-13 19-4 4-4 10-9 13'/><path d='M42 91q-2 12 9 16' />",
         "sleep_symbol": "<path d='M18 28h34L18 61h35M65 16h37L65 53h37M48 76h55L48 111h55'/><path d='m20 12 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z'/> ",
@@ -485,7 +450,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:{"drop-shadow(0 9px 5px rgba(0,0,0,.58)) drop-shadow(0 0 17px rgba(0,210,255,.34))" if kind in ("robot", "mobile", "speaker", "traffic_light") else "drop-shadow(0 9px 5px rgba(0,0,0,.58)) drop-shadow(0 0 17px rgba(255,176,32,.34))" if kind in ("bitcoin", "banknote", "money") else "drop-shadow(0 8px 5px rgba(0,0,0,.58)) drop-shadow(0 0 14px rgba(120,190,255,.22))"}'>"
+            f"style='filter:drop-shadow(0 10px 20px rgba(0,0,0,.65)) drop-shadow(0 0 20px rgba(255,210,31,.35))'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
@@ -515,15 +480,14 @@ def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f".bg-cinematic {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: {BACKGROUND_PATTERN};"
-        f"  box-shadow:inset 0 0 130px rgba(0,0,0,.30),inset 0 2px 0 rgba(255,255,255,.035);"
+        f"  background: {BACKGROUND_CSS};"
         f"}}"
         f".glow-orb {{"
-        f"  position: absolute; width: 650px; height: 650px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
-        f"  background: transparent;"
+        f"  position: absolute; width: 700px; height: 700px; top: 32%; left: 50%; transform: translate(-50%, -50%);"
+        f"  background: {BACKGROUND_PATTERN};"
         f"  border-radius: 50%; pointer-events: none;"
         f"}}"
         f"</style></head><body>"
@@ -560,17 +524,17 @@ def sub_html(text, icon_override=None):
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:650px;height:320px;display:flex;justify-content:center;align-items:center;}}"
-        f".sub-icon svg{{width:260px;height:260px;filter:drop-shadow(0 12px 24px rgba(255,210,31,.24));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:620px;height:320px;display:flex;justify-content:center;align-items:center;}}"
+        f".sub-icon svg{{width:260px;height:260px;filter:drop-shadow(0 12px 28px rgba(0,0,0,.7)) drop-shadow(0 0 24px rgba(255,210,31,.35));animation:softPulse 2.8s ease-in-out infinite alternate;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(14,14,20,0.97);color:#f3f4f6;font-family:{FONT};"
+        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(10,10,14,0.96);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
         f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
-        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.22);"
-        f"box-shadow:0 28px 60px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.10),inset 0 -2px 0 rgba(0,0,0,.34);}}"
-        f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 14px rgba(255,210,31,0.28)}}"
+        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.25);"
+        f"box-shadow:0 30px 70px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.12);}}"
+        f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 16px rgba(255,210,31,0.35)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
-        f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.94;text-shadow:0 0 16px rgba(255,210,31,0.24)}}"
+        f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.95;text-shadow:0 0 16px rgba(255,210,31,0.3)}}"
         f"@keyframes softPulse {{"
         f"  0% {{ transform: scale(0.93); opacity: 0.85; }}"
         f"  100% {{ transform: scale(1.05); opacity: 1; }}"
@@ -583,48 +547,31 @@ def sub_html(text, icon_override=None):
     )
 
 
-def brand_logo_svg(size=112):
-    """Original Mr.Continuity emblem: an unbroken golden path forming an ascending M."""
-    return (
-        f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' role='img' aria-label='Mr Continuity logo'>"
-        "<defs><linearGradient id='gold' x1='0' y1='0' x2='1' y2='1'>"
-        "<stop offset='0' stop-color='#FFF0A6'/><stop offset='.48' stop-color='#FFD21F'/><stop offset='1' stop-color='#B77A08'/></linearGradient>"
-        "<filter id='glow'><feGaussianBlur stdDeviation='2.4' result='b'/><feMerge><feMergeNode in='b'/><feMergeNode in='SourceGraphic'/></feMerge></filter></defs>"
-        "<path d='M60 7a53 53 0 1 0 53 53' fill='none' stroke='url(#gold)' stroke-width='2.2' opacity='.55'/>"
-        "<path d='M25 82V37l24 28 11-14 11 14 24-28v45' fill='none' stroke='url(#gold)' stroke-width='7' stroke-linecap='round' stroke-linejoin='round' filter='url(#glow)'/>"
-        "<path d='M60 65v23' stroke='#FFF0A6' stroke-width='3' stroke-linecap='round'/><circle cx='60' cy='96' r='4' fill='#FFD21F'/>"
-        "</svg>"
-    )
-
-
 def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
-    """Icon-only cover matching the reel background; body scenes continue using the same vector icon system."""
     word = cover_word(hook)
-    # آیکون و هویت برند همیشه زرد؛ تنوع کاورها فقط از چیدمان و هندسه می‌آید.
     accent = YELLOW
-    glow_a = "rgba(255,210,31,.16)"
-    glow_b = "rgba(145,157,177,.10)"
-    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=300 + (cover_variant % 3) * 22)
+    glow_a = "rgba(255,210,31,.22)"
+    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=320 + (cover_variant % 3) * 20)
     layout_shift = (cover_variant % 4)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
-        f".grain{{position:absolute;inset:0;background:{BACKGROUND_PATTERN};pointer-events:none;opacity:.95;box-shadow:inset 0 0 150px rgba(0,0,0,.34),inset 0 2px 0 rgba(255,255,255,.04)}}"
+        f".bg-cinematic{{position:absolute;inset:0;background:{BACKGROUND_CSS};pointer-events:none;}}"
+        f".glow-orb{{position:absolute;width:800px;height:800px;top:32%;left:50%;transform:translate(-50%,-50%);background:{BACKGROUND_PATTERN};border-radius:50%;pointer-events:none;}}"
         f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
         f"margin-top:-55px;position:relative}}"
-        f".visual:before{{content:'';position:absolute;width:{420 + layout_shift*24}px;height:{420 + layout_shift*24}px;border-radius:{'50%' if layout_shift % 2 == 0 else '34%'};"
-        f"border:1px solid {glow_a};box-shadow:0 0 75px {glow_a},inset 0 0 54px {glow_b}}}"
-        f".cover-icon{{width:{300 + (cover_variant % 3)*22}px;height:{300 + (cover_variant % 3)*22}px;filter:drop-shadow(0 16px 28px rgba(0,0,0,.55)) drop-shadow(0 0 26px {glow_a});animation:float 4s ease-in-out infinite}}"
-        f".word{{z-index:2;color:{accent};font-weight:800;font-size:112px;line-height:1.42;max-width:920px;"
-        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 34px {glow_a};margin-top:{-4 + layout_shift*9}px}}"
-        f".rule{{width:{110 + layout_shift*22}px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);margin-top:25px}}"
+        f".cover-icon{{width:{320 + (cover_variant % 3)*20}px;height:{320 + (cover_variant % 3)*20}px;filter:drop-shadow(0 18px 30px rgba(0,0,0,.7)) drop-shadow(0 0 30px {glow_a});animation:float 4s ease-in-out infinite}}"
+        f".word{{z-index:2;color:{accent};font-weight:800;font-size:116px;line-height:1.42;max-width:920px;"
+        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 35px {glow_a};margin-top:{-4 + layout_shift*9}px}}"
+        f".rule{{width:{110 + layout_shift*22}px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);margin-top:25px;z-index:2}}"
         f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{accent};font-family:{FONT};{FONT_RENDERING}"
-        f"font-size:35px;font-weight:700;line-height:1.5;letter-spacing:0;opacity:.94;text-shadow:0 0 16px {glow_a};z-index:2}}"
+        f"font-size:35px;font-weight:700;letter-spacing:0;opacity:.95;text-shadow:0 0 16px {glow_a};z-index:2}}"
         f"@keyframes float{{0%,100%{{transform:translateY(0) scale(1)}}50%{{transform:translateY(-10px) scale(1.025)}}}}"
-        f"</style></head><body><div class='grain'></div>"
+        f"</style></head><body>"
+        f"<div class='bg-cinematic'></div><div class='glow-orb'></div>"
         f"<div class='visual'>{cover_icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>"
     )
@@ -635,14 +582,14 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;position:relative;"
-        f"background-image:{BACKGROUND_PATTERN};"
+        f"background-image:{BACKGROUND_CSS};"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
         f".slogan{{font-family:{FONT};{FONT_RENDERING}font-size:68px;font-weight:800;line-height:1.55;color:{YELLOW};"
-        f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 30px rgba(255,210,31,0.3)}}"
-        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:{YELLOW};line-height:1.6;letter-spacing:0;text-shadow:0 0 16px rgba(255,210,31,.20)}}"
+        f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 35px rgba(255,210,31,0.35)}}"
+        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:{YELLOW};line-height:1.6;letter-spacing:0;text-shadow:0 0 18px rgba(255,210,31,.25)}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
@@ -651,7 +598,6 @@ def outro_html(mascot=False):
 
 
 async def render_pages(jobs):
-    """Render HTML pages with Playwright's async API (safe inside build's event loop)."""
     from playwright.async_api import async_playwright
 
     async with async_playwright() as p:
@@ -765,7 +711,6 @@ async def build(hook, scenes, d, dst, tag=None):
             known_hashes.add(hashlib.sha256(old_cover.read_bytes()).hexdigest())
         except OSError:
             pass
-    # Randomized composition/color variants are regenerated if an exact duplicate exists.
     cover_variant = random.SystemRandom().randrange(0, 6)
     for attempt in range(24):
         candidate_variant = (cover_variant + attempt) % 24
