@@ -1,10 +1,10 @@
-"""Persian Reel builder v4.7 (Ultra-Professional Cinematic Clean Black & White Matte Motion UI).
+"""Persian Reel builder v4.8 (Modern Split Black & White Matte Motion UI).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature high-end cinematic pure black matte aesthetics with smooth motion icons.
+Backgrounds feature a modern split white and black cinematic layout with motion icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -41,13 +41,9 @@ VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 
-# پالت رنگی کلاسیک و مدرن: مشکی کربنی خالص با سایه‌ها و گرادیانت‌های نوری دودی-سفید
-BACKGROUND = "#020204"
+# ترکیب مدرن دو‌تکه: سفید مات و مشکی کربنی با تفکیک هندسی شیک
 BACKGROUND_CSS = (
-    "radial-gradient(circle at 50% 30%, rgba(35,35,45,0.65) 0%, rgba(10,10,15,0.95) 60%, #020204 100%)"
-)
-BACKGROUND_PATTERN = (
-    "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05) 0%, transparent 70%)"
+    "linear-gradient(135deg, #F4F4F6 0%, #E2E2E6 50%, #0A0A0E 50.2%, #030305 100%);"
 )
 YELLOW = "#FFD21F"
 
@@ -353,7 +349,7 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:drop-shadow(0 12px 25px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(255,210,31,.45));animation:iconMotion 2.6s ease-in-out infinite alternate;'>"
+            f"style='filter:drop-shadow(0 12px 25px rgba(0,0,0,.6)) drop-shadow(0 0 24px rgba(255,210,31,.4));animation:iconMotion 2.6s ease-in-out infinite alternate;'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
@@ -364,19 +360,15 @@ def bg_html(image_path, idx, total, title):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
-        f".bg-cinematic {{"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;"
+        f"background:{BACKGROUND_CSS}}}"
+        f".split-overlay {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: {BACKGROUND_CSS};"
-        f"}}"
-        f".glow-orb {{"
-        f"  position: absolute; width: 750px; height: 750px; top: 30%; left: 50%; transform: translate(-50%, -50%);"
-        f"  background: {BACKGROUND_PATTERN};"
-        f"  border-radius: 50%; pointer-events: none;"
+        f"  background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.15) 0%, transparent 70%);"
+        f"  pointer-events: none;"
         f"}}"
         f"</style></head><body>"
-        f"<div class='bg-cinematic'></div>"
-        f"<div class='glow-orb'></div>"
+        f"<div class='split-overlay'></div>"
         f"</body></html>"
     )
 
@@ -408,21 +400,21 @@ def sub_html(text, icon_override=None):
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;background:transparent;overflow:hidden}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}}}"
-        f".sub-icon{{position:absolute;left:0;right:0;top:600px;height:340px;display:flex;justify-content:center;align-items:center;}}"
+        f".sub-icon{{position:absolute;left:0;right:0;top:580px;height:340px;display:flex;justify-content:center;align-items:center;}}"
         f".sub-icon svg{{width:280px;height:280px;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(12,12,18,0.97);color:#f3f4f6;font-family:{FONT};"
+        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(12,12,18,0.96);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
         f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
         f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.3);text-shadow:0 2px 4px rgba(0,0,0,.6);"
-        f"box-shadow:0 30px 70px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.15);}}"
+        f"box-shadow:0 30px 70px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.15);}}"
         f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 18px rgba(255,210,31,0.4)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.95;text-shadow:0 0 18px rgba(255,210,31,0.35)}}"
         f"@keyframes iconMotion {{"
         f"  0% {{ transform: scale(0.85) translateY(12px); opacity: 0; filter: drop-shadow(0 0 0px rgba(255,210,31,0)); }}"
         f"  50% {{ transform: scale(1.06) translateY(-4px); opacity: 1; }}"
-        f"  100% {{ transform: scale(1.0) translateY(0); opacity: 1; filter: drop-shadow(0 12px 25px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(255,210,31,.45)); }}"
+        f"  100% {{ transform: scale(1.0) translateY(0); opacity: 1; filter: drop-shadow(0 12px 25px rgba(0,0,0,.6)) drop-shadow(0 0 24px rgba(255,210,31,.4)); }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
@@ -440,20 +432,16 @@ def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
-        f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
-        f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
-        f".bg-cinematic{{position:absolute;inset:0;background:{BACKGROUND_CSS};pointer-events:none;}}"
-        f".glow-orb{{position:absolute;width:850px;height:850px;top:30%;left:50%;transform:translate(-50%,-50%);background:{BACKGROUND_PATTERN};border-radius:50%;pointer-events:none;}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;"
+        f"background:{BACKGROUND_CSS}}}"
         f".visual{{width:540px;height:520px;display:flex;align-items:center;justify-content:center;z-index:2;"
-        f"margin-top:-55px;position:relative}}"
-        f".word{{z-index:2;color:{accent};font-weight:800;font-size:118px;line-height:1.42;max-width:920px;"
-        f"padding:0 48px;text-wrap:balance;text-shadow:0 8px 40px {glow_a};margin-top:10px}}"
-        f".rule{{width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);margin-top:25px;z-index:2}}"
+        f"position:absolute;top:280px;left:50%;transform:translateX(-50%)}}"
+        f".word{{position:absolute;top:840px;left:0;right:0;z-index:2;color:{accent};font-weight:800;font-size:118px;line-height:1.42;max-width:920px;"
+        f"margin:0 auto;text-align:center;padding:0 48px;text-wrap:balance;text-shadow:0 8px 40px {glow_a}}}"
+        f".rule{{position:absolute;top:1000px;left:50%;transform:translateX(-50%);width:130px;height:4px;border-radius:8px;background:linear-gradient(90deg,transparent,{accent},transparent);z-index:2}}"
         f".brand{{position:absolute;bottom:112px;left:0;right:0;color:{accent};font-family:{FONT};{FONT_RENDERING}"
-        f"font-size:35px;font-weight:700;letter-spacing:0;opacity:.95;text-shadow:0 0 18px {glow_a};z-index:2}}"
+        f"font-size:35px;font-weight:700;letter-spacing:0;opacity:.95;text-shadow:0 0 18px {glow_a};z-index:2;text-align:center}}"
         f"</style></head><body>"
-        f"<div class='bg-cinematic'></div><div class='glow-orb'></div>"
         f"<div class='visual'>{cover_icon}</div><div class='word'>{html.escape(word)}</div><div class='rule'></div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div></body></html>"
     )
@@ -464,9 +452,9 @@ def outro_html(mascot=False):
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;"
+        f"background:{BACKGROUND_CSS}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;position:relative;"
-        f"background-image:{BACKGROUND_CSS};"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
         f".slogan{{font-family:{FONT};{FONT_RENDERING}font-size:68px;font-weight:800;line-height:1.55;color:{YELLOW};"
