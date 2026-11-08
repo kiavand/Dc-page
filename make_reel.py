@@ -41,9 +41,19 @@ MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
-BACKGROUND = "#07080D"  # پایه‌ی یکسان برای کاور، صحنه‌ها و پایان ویدئو
-# دو سایه‌ی سینمایی بسیار ملایم؛ بدون تغییر ناگهانی رنگ بین کاور و بدنه
-BACKGROUND_CSS = "radial-gradient(ellipse at 12% 18%, rgba(0,170,190,.34) 0%, rgba(0,170,190,0) 48%), radial-gradient(ellipse at 88% 82%, rgba(190,91,35,.34) 0%, rgba(190,91,35,0) 50%), linear-gradient(135deg,#080D19 0%,#11101A 52%,#160E12 100%)"
+BACKGROUND = "#102832"  # هویت ثابت: دو رنگ لوکس و متضاد، عمیق و غیرشاد
+# دو پنل موربِ برجسته: سبزآبی نفتی در کنار آلویی/زرشکی تیره؛ نور از بالا و سایه در محل اتصال
+BACKGROUND_CSS = (
+    "radial-gradient(ellipse at 18% 12%,rgba(116,159,164,.22) 0%,transparent 42%),"
+    "radial-gradient(ellipse at 84% 88%,rgba(151,91,111,.20) 0%,transparent 44%),"
+    "linear-gradient(112deg,#173943 0%,#102832 48.8%,#342633 51.2%,#241C29 100%)"
+)
+BACKGROUND_PATTERN = (
+    "linear-gradient(112deg,transparent 0%,rgba(255,255,255,.055) 49.7%,"
+    "rgba(0,0,0,.34) 50%,transparent 50.5%),"
+    "repeating-linear-gradient(135deg,rgba(255,255,255,.014) 0px,"
+    "rgba(255,255,255,.014) 1px,transparent 1px,transparent 38px)"
+)
 YELLOW = "#FFD21F"
 
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -508,7 +518,8 @@ def bg_html(image_path, idx, total, title):
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
         f".bg-cinematic {{"
         f"  position: absolute; width: 100%; height: 100%; top: 0; left: 0;"
-        f"  background: {BACKGROUND_CSS};"
+        f"  background: {BACKGROUND_PATTERN};"
+        f"  box-shadow:inset 0 0 130px rgba(0,0,0,.30),inset 0 2px 0 rgba(255,255,255,.035);"
         f"}}"
         f".glow-orb {{"
         f"  position: absolute; width: 650px; height: 650px; top: 25%; left: 50%; transform: translate(-50%, -50%);"
@@ -556,7 +567,7 @@ def sub_html(text, icon_override=None):
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
         f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
         f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.22);"
-        f"box-shadow: 0 28px 60px rgba(0,0,0,0.85);}}"
+        f"box-shadow:0 28px 60px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.10),inset 0 -2px 0 rgba(0,0,0,.34);}}"
         f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 14px rgba(255,210,31,0.28)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.94;text-shadow:0 0 16px rgba(255,210,31,0.24)}}"
@@ -589,22 +600,19 @@ def brand_logo_svg(size=112):
 def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
     """Icon-only cover matching the reel background; body scenes continue using the same vector icon system."""
     word = cover_word(hook)
-    palettes = [("#FFD21F", "rgba(0,210,255,.22)", "rgba(255,132,45,.20)"),
-                ("#63E6D2", "rgba(99,230,210,.24)", "rgba(255,92,120,.20)"),
-                ("#FFB86B", "rgba(255,184,107,.24)", "rgba(92,142,255,.22)"),
-                ("#B9A2FF", "rgba(185,162,255,.24)", "rgba(255,190,92,.20)"),
-                ("#F4F4F4", "rgba(75,190,255,.23)", "rgba(255,105,105,.20)"),
-                ("#FF8FB1", "rgba(255,143,177,.23)", "rgba(83,190,255,.22)")]
-    accent, glow_a, glow_b = palettes[cover_variant % len(palettes)]
-    cover_icon = icon_svg(hook + " " + word, color=accent, size=300 + (cover_variant % 3) * 22)
+    # آیکون و هویت برند همیشه زرد؛ تنوع کاورها فقط از چیدمان و هندسه می‌آید.
+    accent = YELLOW
+    glow_a = "rgba(255,210,31,.16)"
+    glow_b = "rgba(145,157,177,.10)"
+    cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=300 + (cover_variant % 3) * 22)
     layout_shift = (cover_variant % 4)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
-        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:radial-gradient(ellipse at {15 + (cover_variant*13)%70}% {18 + (cover_variant*17)%65}%,{glow_a},transparent 48%),radial-gradient(ellipse at {85 - (cover_variant*11)%65}% {80 - (cover_variant*9)%55}%,{glow_b},transparent 50%),{BACKGROUND_CSS}}}"
+        f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
         f"body{{font-family:{FONT};{FONT_RENDERING}color:#fff;position:relative;text-align:center;"
         f"display:flex;flex-direction:column;align-items:center;justify-content:center}}"
-        f".grain{{position:absolute;inset:0;background:transparent;pointer-events:none}}"
+        f".grain{{position:absolute;inset:0;background:{BACKGROUND_PATTERN};pointer-events:none;opacity:.95;box-shadow:inset 0 0 150px rgba(0,0,0,.34),inset 0 2px 0 rgba(255,255,255,.04)}}"
         f".visual{{width:540px;height:500px;display:flex;align-items:center;justify-content:center;z-index:2;"
         f"margin-top:-55px;position:relative}}"
         f".visual:before{{content:'';position:absolute;width:{420 + layout_shift*24}px;height:{420 + layout_shift*24}px;border-radius:{'50%' if layout_shift % 2 == 0 else '34%'};"
@@ -628,12 +636,13 @@ def outro_html(mascot=False):
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
         f"<style>"
         f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{BACKGROUND_CSS}}}"
-        f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;"
+        f"body{{font-family:{FONT};{FONT_RENDERING}color:{YELLOW};display:flex;align-items:center;justify-content:center;position:relative;"
+        f"background-image:{BACKGROUND_PATTERN};"
         f"text-align:center}}.wrap{{width:980px;display:flex;flex-direction:column;align-items:center;"
         f"justify-content:center;gap:30px}}"
         f".slogan{{font-family:{FONT};{FONT_RENDERING}font-size:68px;font-weight:800;line-height:1.55;color:{YELLOW};"
         f"white-space:nowrap;letter-spacing:0;text-shadow:0 0 30px rgba(255,210,31,0.3)}}"
-        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:#f3f4f6;line-height:1.6;letter-spacing:0}}"
+        f".brand{{font-family:{FONT};{FONT_RENDERING}font-size:40px;font-weight:700;color:{YELLOW};line-height:1.6;letter-spacing:0;text-shadow:0 0 16px rgba(255,210,31,.20)}}"
         f"</style></head><body><div class='wrap'>"
         f"<div class='slogan'>{html.escape(slogan)}</div>"
         f"<div class='brand'>{html.escape(BRAND_NAME)}</div>"
