@@ -1,10 +1,10 @@
-"""Persian Reel builder v4.6 (Ultra-Professional Cinematic Deep Olive & Motion Icons).
+"""Persian Reel builder v4.7 (Ultra-Professional Cinematic Clean Black & White Matte Motion UI).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook (spoken first, shown on the cover)
   every other non-empty line    -> one scene:   عنوان کوتاه :: متن روایت
 Each sentence is spoken and shown on screen one at a time.
-Backgrounds feature high-end cinematic deep olive/matte dark aesthetics with smooth motion icons.
+Backgrounds feature high-end cinematic pure black matte aesthetics with smooth motion icons.
 
 Usage: python make_reel.py input.txt out/reel.mp4
 Outputs: reel.mp4 and cover.png in the same folder.
@@ -41,13 +41,13 @@ VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid)
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 
-# پالت رنگی حرفه‌ای: سبز لجنی/زیتونی بسیار تیره و عمیق در ترکیب با مشکی کربنی و طلایی پرمیوم
-BACKGROUND = "#09120B"
+# پالت رنگی کلاسیک و مدرن: مشکی کربنی خالص با سایه‌ها و گرادیانت‌های نوری دودی-سفید
+BACKGROUND = "#020204"
 BACKGROUND_CSS = (
-    "radial-gradient(circle at 50% 30%, rgba(30,55,35,0.75) 0%, rgba(9,18,11,0.96) 60%, #060D08 100%)"
+    "radial-gradient(circle at 50% 30%, rgba(35,35,45,0.65) 0%, rgba(10,10,15,0.95) 60%, #020204 100%)"
 )
 BACKGROUND_PATTERN = (
-    "radial-gradient(circle at 50% 30%, rgba(255,210,31,0.08) 0%, transparent 70%)"
+    "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05) 0%, transparent 70%)"
 )
 YELLOW = "#FFD21F"
 
@@ -353,11 +353,10 @@ def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
     return (f"<svg width='{size}' height='{size}' viewBox='0 0 120 120' "
             f"fill='none' stroke='{color}' stroke-width='5.5' stroke-linecap='round' "
             f"stroke-linejoin='round' aria-label='{kind}' "
-            f"style='filter:drop-shadow(0 12px 25px rgba(0,0,0,.75)) drop-shadow(0 0 24px rgba(255,210,31,.4));animation:iconMotion 2.6s ease-in-out infinite alternate;'>"
+            f"style='filter:drop-shadow(0 12px 25px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(255,210,31,.45));animation:iconMotion 2.6s ease-in-out infinite alternate;'>"
             f"<g transform='translate(0 -1)'>{paths[kind]}</g></svg>")
 
 def cover_word(hook):
-    t = norm(hook).strip()
     return "نقاب"
 
 
@@ -412,18 +411,18 @@ def sub_html(text, icon_override=None):
         f".sub-icon{{position:absolute;left:0;right:0;top:600px;height:340px;display:flex;justify-content:center;align-items:center;}}"
         f".sub-icon svg{{width:280px;height:280px;}}"
         f".w{{position:absolute;left:60px;right:60px;top:990px;display:flex;justify-content:center}}"
-        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(9,18,11,0.97);color:#f3f4f6;font-family:{FONT};"
+        f".b{{width:100%;max-width:960px;box-sizing:border-box;background:rgba(12,12,18,0.97);color:#f3f4f6;font-family:{FONT};"
         f"{FONT_RENDERING}font-weight:700;font-size:{size}px;line-height:1.72;padding:34px 46px;"
         f"border-radius:34px;text-align:center;direction:rtl;unicode-bidi:plaintext;letter-spacing:0;"
-        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.28);"
-        f"box-shadow:0 30px 70px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.15);}}"
+        f"text-wrap:pretty;overflow-wrap:anywhere;border:1.8px solid rgba(255,210,31,0.3);text-shadow:0 2px 4px rgba(0,0,0,.6);"
+        f"box-shadow:0 30px 70px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.15);}}"
         f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 18px rgba(255,210,31,0.4)}}"
         f".brand{{position:absolute;left:0;right:0;top:1530px;text-align:center;color:{YELLOW};"
         f"font-family:{FONT};{FONT_RENDERING}font-size:34px;font-weight:700;letter-spacing:0;opacity:0.95;text-shadow:0 0 18px rgba(255,210,31,0.35)}}"
         f"@keyframes iconMotion {{"
         f"  0% {{ transform: scale(0.85) translateY(12px); opacity: 0; filter: drop-shadow(0 0 0px rgba(255,210,31,0)); }}"
         f"  50% {{ transform: scale(1.06) translateY(-4px); opacity: 1; }}"
-        f"  100% {{ transform: scale(1.0) translateY(0); opacity: 1; filter: drop-shadow(0 12px 25px rgba(0,0,0,.75)) drop-shadow(0 0 24px rgba(255,210,31,.4)); }}"
+        f"  100% {{ transform: scale(1.0) translateY(0); opacity: 1; filter: drop-shadow(0 12px 25px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(255,210,31,.45)); }}"
         f"}}"
         f"</style></head><body>"
         f"<div class='sub-icon'>{icon}</div>"
@@ -436,7 +435,7 @@ def sub_html(text, icon_override=None):
 def cover_html(hook, tag=None, mascot=False, cover_image=None, cover_variant=0):
     word = cover_word(hook)
     accent = YELLOW
-    glow_a = "rgba(255,210,31,.25)"
+    glow_a = "rgba(255,210,31,.28)"
     cover_icon = icon_svg(hook + " " + word, color=YELLOW, size=340)
     return (
         f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{FONT_LINK}"
