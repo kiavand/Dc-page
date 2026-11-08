@@ -641,16 +641,20 @@ def outro_html(mascot=False):
     )
 
 
-def render_pages(jobs):
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": W, "height": H})
-        for content, out, transparent in jobs:
-            page.set_content(content, wait_until="networkidle")
-            page.evaluate("document.fonts.ready.then(() => true)")
-            page.screenshot(path=str(out), omit_background=transparent)
-        browser.close()
+async def render_pages(jobs):
+    """Render HTML pages with Playwright's async API (safe inside build's event loop)."""
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        try:
+            page = await browser.new_page(viewport={"width": W, "height": H})
+            for content, out, transparent in jobs:
+                await page.set_content(content, wait_until="networkidle")
+                await page.evaluate("document.fonts.ready.then(() => true)")
+                await page.screenshot(path=str(out), omit_background=transparent)
+        finally:
+            await browser.close()
 
 
 def scene_video(idx, bg_png, subs, dur, is_last, out, mascots=()):
@@ -757,7 +761,7 @@ async def build(hook, scenes, d, dst, tag=None):
     for attempt in range(24):
         candidate_variant = (cover_variant + attempt) % 24
         candidate_html = cover_html(hook, cover_variant=candidate_variant)
-        render_pages([(candidate_html, cover_png, False)])
+        await render_pages([(candidate_html, cover_png, False)])
         candidate_hash = hashlib.sha256(cover_png.read_bytes()).hexdigest()
         if candidate_hash not in known_hashes:
             cover_variant = candidate_variant
@@ -785,7 +789,7 @@ async def build(hook, scenes, d, dst, tag=None):
     jobs.append((outro_html(), outro_png, False))
     bg_pngs.append(outro_png)
     sub_pngs.append([])
-    await asyncio.to_thread(render_pages, jobs)
+    await render_pages(jobs)
 
     clips, durs = [], []
     for i in range(n):
