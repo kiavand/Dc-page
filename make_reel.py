@@ -266,6 +266,22 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, tail=TAIL, lead=0.0):
 # ---------------------------------------------------------------- smart icons mapping (High-End Vector Precision)
 def icon_kind(text):
     t = norm(text).lower()
+
+    # Semantic overrides: interpret the whole idea before matching isolated words.
+    # These rules prevent a surface word (e.g. "لبخند") from selecting an unrelated
+    # object icon and give priority to the sentence's actual message.
+    semantic_rules = [
+        (("لبخند" , "خیرخواه", "ظاهر و باطن", "ظاهرش", "نیت پنهان", "پشت چهره", "چهره واقعی", "فریب", "ریاکار", "دورویی", "نقاب", "تظاهر"), "mask"),
+        (("شناخت افراد", "قضاوت درباره افراد", "رفتار آدم ها", "شخصیت افراد", "چهره افراد"), "people"),
+        (("گوش دادن", "شنیدن حرف", "به حرف", "خوب گوش", "شنونده"), "ear"),
+        (("لبخند", "خنده", "شادمانی", "خوشحالی"), "heart"),
+        (("اعتماد", "اعتماد کردن", "اعتماد نکردن", "قابل اعتماد", "بی اعتماد"), "shield"),
+        (("پول نقد", "اسکناس", "درآمد مالی", "سرمایه مالی", "هزینه مالی"), "banknote"),
+    ]
+    for phrases, kind in semantic_rules:
+        if any(norm(phrase) in t for phrase in phrases):
+            return kind
+
     specific_rules = [
         # Dedicated technology and crypto symbols take priority over generic network/money rules.
         (("هوش مصنوعی", "هوش مصنوعی", "ai", "ربات", "ربات هوشمند", "مدل زبانی", "چت بات", "چتبات", "قرارداد هوشمند", "قرارداد", "اسمارت کانترکت", "smart contract", "smart contracts", "کانترکت", "contract", "contracts"), "robot"),
@@ -386,15 +402,28 @@ ICON_ALTERNATES = {
 }
 
 def assign_unique_icon_kinds(texts, reserved=()):
-    used=set(reserved); result=[]
-    for text in texts:
-        preferred=icon_kind(text)
-        candidates=[preferred, *ICON_ALTERNATES.get(preferred, ())]
-        candidates += [k for k in ICON_LIBRARY if k not in candidates]
-        chosen=next((k for k in candidates if k not in used), None)
-        if chosen is None:
-            chosen=next((k for k in candidates if not result or k != result[-1]), preferred)
-        result.append(chosen); used.add(chosen)
+    """Choose semantically relevant icons; uniqueness is secondary to meaning.
+
+    Each item may be plain text or (chunk_text, full_scene_context). The full scene
+    is used to resolve references that are unclear when a subtitle is split into
+    short chunks. Only known semantic alternatives are considered; the selector
+    never substitutes an arbitrary unrelated icon just to avoid repetition.
+    """
+    used = set(reserved)
+    result = []
+    for item in texts:
+        if isinstance(item, (tuple, list)) and len(item) >= 2:
+            text, context = item[0], item[1]
+            combined = f"{context} {text}"
+        else:
+            text = item
+            combined = str(item)
+        preferred = icon_kind(combined)
+        candidates = [preferred, *ICON_ALTERNATES.get(preferred, ())]
+        # Avoid repeats only when a semantically related alternative is available.
+        chosen = next((kind for kind in candidates if kind not in used), preferred)
+        result.append(chosen)
+        used.add(chosen)
     return result
 
 def icon_svg(text, color="#FFFFFF", size=300, kind_override=None):
@@ -748,7 +777,12 @@ async def build(hook, scenes, d, dst, tag=None):
 
     jobs, bg_pngs, sub_pngs = [], [], []
     cover_kind = icon_kind(hook + " " + cover_word(hook))
-    all_texts = [txt for sh in shots for txt in sh["chunks"]]
+    # Keep the complete scene meaning attached to every rendered subtitle chunk.
+    # This prevents chunk-level keyword matching from losing the sentence context.
+    all_texts = [
+        (txt, " ".join([sh.get("title", ""), *sh["chunks"]]))
+        for sh in shots for txt in sh["chunks"]
+    ]
     assigned_kinds = iter(assign_unique_icon_kinds(all_texts, reserved=(cover_kind,)))
     cover_png = d / "cover.png"
     history_dir = dst.parent / ".cover_history"
