@@ -55,7 +55,7 @@ SAFE_TOP = 270
 SAFE_BOTTOM = 670
 SAFE_SIDE = 80
 MAX_CHARS = 58                   # max characters per on-screen sentence chunk
-OPENING_LEAD = 0.0               # hook starts speaking on frame 0
+OPENING_LEAD = 0.3               # short silence so the opening impact never covers the first word
 COVER_PAUSE = 0.30               # pause after the spoken hook
 COVER_MIN = 1.8                  # hook screen is at least this long
 PAUSE_SENT = 0.40                # pause after . ! ? …
@@ -69,6 +69,7 @@ TRANSITIONS = ("fade", "smoothleft", "fade", "smoothright")
 ZOOM_END = 0.06                  # background zoom amount per scene (alternates in/out)
 RISE_T = 0.38                    # slide-in time of icon/card (s)
 MUSIC_VOLUME = 0.12
+ANIM = True                      # pop / rise / drop motion on icons, cards and cover
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid) - unchanged
 RATE = "+0%"                     # speaking rate, e.g. "+5%"
 MAX_REEL_SECONDS = 60            # warn when the reel is longer
@@ -88,10 +89,13 @@ CTA_ITEMS = (("user_plus", "فالو کن"), ("bookmark", "ذخیره کن"), ("
 CTA_SPEECH = "اگه به دردت خورد، ذخیره کن و برای دوستت بفرست."      # spoken on the end card ("" = silent)
 TEASERS = ("تا آخر ببین", "نکته‌ی آخرش مهم‌ترینه", "قبل از اسکرول، این رو ببین")  # cover chip, () disables
 
+# Subtitles: Vazirmatn (clean, very readable). Headlines/cover/numbers: Lalezar (bold display).
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
              '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-             '<link href="https://fonts.googleapis.com/css2?family=Estedad:wght@400;500;600;700;800&display=swap" rel="stylesheet">')
-FONT = "'Estedad','Vazirmatn','Tahoma','DejaVu Sans',sans-serif"
+             '<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Vazirmatn:wght@400;600;700;800;900'
+             '&family=Estedad:wght@400;700;800&display=swap" rel="stylesheet">')
+FONT = "'Vazirmatn','Estedad','Tahoma','DejaVu Sans',sans-serif"
+DISPLAY = "'Lalezar','Vazirmatn','Estedad','Tahoma','DejaVu Sans',sans-serif"
 FONT_RENDERING = ("font-kerning:normal;font-feature-settings:'kern' 1,'liga' 1,'calt' 1;"
                   "font-synthesis:none;text-rendering:optimizeLegibility;")
 
@@ -325,7 +329,7 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
 SR = 44100
 
 
-def _whoosh(rnd, dur=0.6, vol=0.9):
+def _whoosh(rnd, dur=0.5, vol=0.7):
     n = int(dur * SR)
     out, lp, slow = [0.0] * n, 0.0, 0.0
     ks = 1 - math.exp(-2 * math.pi * 180 / SR)
@@ -344,8 +348,8 @@ def _pop(rnd, vol=0.55):
              + rnd.uniform(-1, 1) * math.exp(-(i / SR) * 400) * 0.35) * vol for i in range(n)]
 
 
-def _impact(rnd, vol=0.9):
-    n = int(1.1 * SR)
+def _impact(rnd, vol=0.6):
+    n = int(0.9 * SR)
     out, lp = [0.0] * n, 0.0
     for i in range(n):
         t = i / SR
@@ -364,7 +368,7 @@ def _ding(vol=0.5):
 
 
 def make_sfx(events, total, path):
-    """events: [(time_s, 'impact'|'whoosh'|'pop'|'ding')] -> stereo wav, same length as the reel."""
+    """events: [(time_s, 'impact'|'whoosh'|'pop'|'ding')]  (never placed on top of speech) -> stereo wav, same length as the reel."""
     rnd = random.Random(7)
     buf = [0.0] * int((total + 1.5) * SR)
     for t, kind in events:
@@ -408,32 +412,32 @@ ICONS = {
  "shop": "<path class='f' d='M18 48h84v57H18Z'/><path d='m13 48 10-27h74l10 27M13 48c0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0 0 10 16 10 16 0'/><path class='f' d='M38 105V72h24v33M74 69h16v16H74Z'/>",
  "tree": "<path class='f' d='M60 12 27 52h18L22 78h29v29h18V78h29L75 52h18Z'/><path d='M60 82v25'/>",
  "brain": "<path class='f' d='M48 20c-13-12-31-2-29 13-13 8-9 27 3 31-5 15 8 27 22 20 5 10 18 9 20-2V22C60 12 51 12 48 20Z'/><path class='f' d='M72 20c13-12 31-2 29 13 13 8 9 27-3 31 5 15-8 27-22 20-5 10-18 9-20-2V22c0-10 9-10 16-2Z'/><path d='M38 31c10 1 14 9 12 18M31 58c10-5 18 1 19 10M83 31c-10 1-14 9-12 18M90 58c-10-5-18 1-19 10'/>",
- "target": "<circle cx='60' cy='60' r='42'/><circle cx='60' cy='60' r='27'/><circle cx='60' cy='60' r='11'/><path d='M60 60 99 21M83 21h16v16'/>",
+ "target": "<circle class='f' cx='60' cy='60' r='48'/><circle cx='60' cy='60' r='35'/><circle class='f' cx='60' cy='60' r='22'/><circle class='s' cx='60' cy='60' r='8'/><path d='M62 58 100 20'/><path class='d' d='M84 28l8 8M92 20l8 8'/>",
  "growth": "<path d='M16 14v92h92'/><path class='f' d='M28 88 50 66l16 12 32-40v68H28Z'/><path d='m28 88 22-22 16 12 32-40'/><path d='M80 38h18v18'/><circle class='s' cx='50' cy='66' r='3.5'/><circle class='s' cx='66' cy='78' r='3.5'/>",
  "book": "<path class='f' d='M15 25c20-7 34-2 45 8v61C49 83 34 79 15 86Z'/><path class='f' d='M105 25c-20-7-34-2-45 8v61c11-11 26-15 45-8Z'/><path d='M29 42c8-2 15 0 22 4M29 55c8-2 15 0 22 4M91 42c-8-2-15 0-22 4M91 55c-8-2-15 0-22 4'/>",
- "heart": "<path class='f' d='M60 99 20 61C-3 36 28 9 49 29l11 11 11-11c21-20 52 7 29 32Z'/>",
+ "heart": "<path class='f' d='M60 106C20 78 8 54 8 38 8 22 21 11 36 11c10 0 19 5 24 15 5-10 14-15 24-15 15 0 28 11 28 27 0 16-12 40-52 68Z'/><path class='d' d='M24 36c0-7 5-12 12-12'/>",
  "time": "<circle cx='60' cy='60' r='42'/><path d='M60 34v28l20 13'/>",
  "question": "<path d='M38 42c2-27 42-31 48-6 4 18-22 21-25 39'/><circle cx='60' cy='91' r='3'/>",
  "network": "<circle cx='60' cy='22' r='10'/><circle cx='25' cy='86' r='10'/><circle cx='95' cy='86' r='10'/><circle cx='60' cy='62' r='12'/><path d='M55 32 42 52M65 32 78 52M50 70 32 79M70 70 88 79'/>",
  "people": "<circle cx='60' cy='31' r='13'/><circle cx='28' cy='43' r='10'/><circle cx='92' cy='43' r='10'/><path d='M34 95V83c0-15 12-26 26-26s26 11 26 26v12M9 91V78c0-10 8-18 18-18M111 91V78c0-10-8-18-18-18'/>",
  "spark": "<path class='f' d='m60 8 12 37 37 15-37 12-12 37-12-37L11 60l37-15Z'/><path class='f' d='m97 9 4 12 12 4-12 4-4 12-4-12-12-4 12-4Z'/>",
- "bulb": "<path class='f' d='M42 76c-3-9-16-17-16-34a34 34 0 1 1 68 0c0 17-13 25-16 34Z'/><path d='M45 88h30M49 99h22M47 76h26M60 4v10M13 42h10M97 42h10M24 17l8 8M96 17l-8 8'/>",
- "shield": "<path class='f' d='M60 10 100 25v29c0 27-17 43-40 56C37 97 20 81 20 54V25Z'/><path d='m40 59 13 13 28-31'/>",
+ "bulb": "<path class='f' d='M60 8C38 8 24 24 24 44c0 14 8 22 14 30 3 4 4 8 4 12h36c0-4 1-8 4-12 6-8 14-16 14-30C96 24 82 8 60 8Z'/><path d='M44 98h32M48 108h24'/><path class='d' d='M50 86V66l10-12 10 12v20M38 40c0-9 6-17 14-20'/>",
+ "shield": "<path class='f' d='M60 8 104 22V58C104 86 84 104 60 112 36 104 16 86 16 58V22Z'/><path class='d' d='M60 20 94 31V58C94 79 79 93 60 100 41 93 26 79 26 58V31Z'/><path d='m42 60 14 14 24-28'/>",
  "chat": "<path class='f' d='M18 23h84v58H55L32 99V81H18Z'/><path d='M34 42h52M34 58h38'/>",
- "trophy": "<path class='f' d='M36 14h48v26c0 21-10 32-24 32S36 61 36 40Z'/><path d='M36 25H17v13c0 15 10 22 23 22M84 25h19v13c0 15-10 22-23 22M60 72v20M40 104h40M45 92h30'/>",
- "compass": "<circle cx='60' cy='60' r='46'/><path class='f' d='m76 34-10 32-32 20 10-32Z'/><circle cx='60' cy='60' r='4'/>",
- "scales": "<path class='f' d='M60 16v84M38 30h44M60 16l-7 8h14Z'/><path d='m28 30-16 31h32ZM92 30 76 61h32ZM40 61c-4 13-20 13-28 0M108 61c-8 13-24 13-32 0M42 100h36'/>",
+ "trophy": "<path class='f' d='M34 12h52v34c0 18-12 30-26 30S34 64 34 46Z'/><path d='M34 22H16c0 22 8 32 20 36M86 22h18c0 22-8 32-20 36'/><path d='M60 76v16M44 108h32M50 92h20v16H50Z'/><path class='s' d='m60 26 4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1Z'/>",
+ "compass": "<circle class='f' cx='60' cy='60' r='52'/><circle class='d' cx='60' cy='60' r='45'/><path class='d' d='M60 25L60 16M74.9 24L76.8 19.3M87.6 32.4L91.1 28.9M96 45.1L100.7 43.2M95 60L104 60M96 74.9L100.7 76.8M87.6 87.6L91.1 91.1M74.9 96L76.8 100.7M60 95L60 104M45.1 96L43.2 100.7M32.4 87.6L28.9 91.1M24 74.9L19.3 76.8M25 60L16 60M24 45.1L19.3 43.2M32.4 32.4L28.9 28.9M45.1 24L43.2 19.3'/><g transform='rotate(40 60 60)'><path class='s' d='M60 22 72 60H48Z'/><path class='f' d='M48 60h24L60 98Z'/></g><circle cx='60' cy='60' r='6' class='f'/><circle class='s' cx='60' cy='60' r='2.5'/>",
+ "scales": "<path d='M60 16v90M40 108h40'/><path d='M18 28h84'/><circle class='s' cx='60' cy='14' r='5'/><path d='M18 28 6 70M18 28l12 42M102 28 90 70M102 28l12 42'/><path class='f' d='M4 70a14 14 0 0 0 28 0Z'/><path class='f' d='M88 70a14 14 0 0 0 28 0Z'/>",
  "calendar": "<rect class='f' x='18' y='25' width='84' height='78' rx='8'/><path d='M18 44h84M39 15v20M81 15v20M36 61h12M56 61h12M76 61h12M36 78h12M56 78h12'/>",
  "handshake": "<path class='f' d='m12 48 20-20 20 4 10 10 10-8 16 2 20 18-18 22-14-4-12 10-12-5-10 1-18-20Z'/><path d='m42 49 18 16c6 5 13-3 8-8M52 42l22 18c6 5 13-3 8-8M32 28l-9-9M88 36l10-8'/>",
  "lightning": "<path class='f' d='M68 8 25 66h28l-5 46 47-65H65Z'/>",
  "flag": "<path d='M25 108V12M27 18h65L78 40l14 20H27'/>",
  "mountain": "<path class='f' d='m8 100 35-62 18 28 13-19 38 53Z'/><path d='m30 61 13-23 18 28 13-19 12 19'/>",
- "lock": "<rect class='f' x='22' y='49' width='76' height='55' rx='8'/><path d='M38 49V34a22 22 0 0 1 44 0v15M60 68v17'/>",
- "eye": "<path class='f' d='M8 60s18-30 52-30 52 30 52 30-18 30-52 30S8 60 8 60Z'/><circle cx='60' cy='60' r='14'/>",
+ "lock": "<rect class='f' x='20' y='52' width='80' height='58' rx='11'/><path d='M34 52V38a26 26 0 0 1 52 0v14'/><circle class='s' cx='60' cy='76' r='8'/><path class='d' d='M60 82v16'/>",
+ "eye": "<path class='f' d='M6 60C22 34 40 24 60 24s38 10 54 36C98 86 80 96 60 96S22 86 6 60Z'/><circle class='d' cx='60' cy='60' r='23'/><circle class='s' cx='60' cy='60' r='10'/><circle class='d' cx='69' cy='51' r='3'/>",
  "puzzle": "<path class='f' d='M20 20h25a12 12 0 1 1 24 0h31v31a12 12 0 1 0 0 24v25H69a12 12 0 1 0-24 0H20V69a12 12 0 1 0 0-24Z'/>",
  "woman": "<circle class='f' cx='60' cy='28' r='17'/><path class='d' d='M43 34c-6 12-4 26 0 34M77 34c6 12 4 26 0 34'/><path class='f' d='M60 52c-16 0-24 12-26 24l-10 32h72L86 76C84 64 76 52 60 52Z'/>",
  "man": "<circle class='f' cx='60' cy='30' r='18'/><path class='f' d='M22 108V84c0-14 10-24 24-24h28c14 0 24 10 24 24v24Z'/><path class='d' d='M60 60v22'/>",
- "sun": "<circle cx='60' cy='60' r='22'/><path d='M60 8v18M60 94v18M8 60h18M94 60h18M23 23l13 13M84 84l13 13M97 23 84 36M36 84 23 97' />",
+ "sun": "<circle class='f' cx='60' cy='60' r='24'/><circle class='d' cx='60' cy='60' r='32'/><path d='M94 60L108 60M89.4 77L96.4 81M77 89.4L84 101.6M60 94L60 102M43 89.4L36 101.6M30.6 77L23.6 81M26 60L12 60M30.6 43L23.6 39M43 30.6L36 18.4M60 26L60 18M77 30.6L84 18.4M89.4 43L96.4 39'/><circle class='s' cx='60' cy='60' r='5'/>",
  "moon": "<path class='f' d='M83 17c-7 4-13 13-15 24-5 25 12 49 37 54-8 10-22 16-37 16-28 0-50-22-50-50S40 11 68 11c5 0 10 2 15 6Z' />",
  "sleep": "<path d='M14 83h92M23 83V58h74v25M23 58l10-17h25l10 17M42 27h16l-16 16h17M75 17h17L75 34h18' />",
  "tools": "<path class='f' d='M22 18a25 25 0 0 0 31 31l43 43-14 14-43-43A25 25 0 0 1 22 18Z'/><path d='m75 19 8-8a19 19 0 0 1 24 24l-18 18-14-14 18-18' />",
@@ -446,18 +450,18 @@ ICONS = {
  "cow": "<path class='f' d='M30 35 13 18 11 51 28 59M90 35l17-17 2 33-17 8M34 43c0-18 12-28 26-28s26 10 26 28v40c0 16-12 27-26 27S34 99 34 83Z'/><path d='M44 58h1M75 58h1M44 82c8 12 24 12 32 0M48 82v8M72 82v8' />",
  "phone": "<path class='f' d='M34 15 20 29c-5 5 1 25 22 46s41 27 46 22l14-14-22-20-13 12c-9-5-17-13-22-22l12-13Z'/><path d='M70 18c17 4 28 15 32 32M70 34c9 2 14 7 16 16'/>",
  "megaphone": "<path class='f' d='M15 48h22l57-25v74L37 72H15Z'/><path d='m37 72 9 28h19L54 79M15 48v24M105 44l9-8M105 72l9 8'/>",
- "gear": "<path class='f' d='M52 10h16l4 13 10 4 11-7 12 12-7 11 4 10 13 4v16l-13 4-4 10 7 11-12 12-11-7-10 4-4 13H52l-4-13-10-4-11 7-12-12 7-11-4-10-13-4V54l13-4 4-10-7-11 12-12 11 7 10-4Z'/><circle cx='60' cy='62' r='19'/>",
- "crown": "<path class='f' d='m14 36 25 19 21-34 21 34 25-19-10 61H24Z'/><path d='M24 84h72M24 97h72'/><circle cx='14' cy='31' r='6'/><circle cx='60' cy='17' r='6'/><circle cx='106' cy='31' r='6'/>",
+ "gear": "<path class='f' d='M53.6 23.6 L54.3 13.4 L65.7 13.4 L66.4 23.6 A37 37 0 0 1 81.2 29.7 L88.9 23 L97 31.1 L90.3 38.8 A37 37 0 0 1 96.4 53.6 L106.6 54.3 L106.6 65.7 L96.4 66.4 A37 37 0 0 1 90.3 81.2 L97 88.9 L88.9 97 L81.2 90.3 A37 37 0 0 1 66.4 96.4 L65.7 106.6 L54.3 106.6 L53.6 96.4 A37 37 0 0 1 38.8 90.3 L31.1 97 L23 88.9 L29.7 81.2 A37 37 0 0 1 23.6 66.4 L13.4 65.7 L13.4 54.3 L23.6 53.6 A37 37 0 0 1 29.7 38.8 L23 31.1 L31.1 23 L38.8 29.7 A37 37 0 0 1 53.6 23.6Z'/><circle class='f' cx='60' cy='60' r='17'/><circle class='d' cx='60' cy='60' r='8'/>",
+ "crown": "<path class='f' d='M12 90 12 40 36 62 60 24 84 62 108 40 108 90Z'/><path class='f' d='M12 90h96v16H12Z'/><path class='d' d='M36 62v28M84 62v28M60 40v50'/><g class='s'><circle cx='12' cy='36' r='6'/><circle cx='60' cy='18' r='6'/><circle cx='108' cy='36' r='6'/></g><path class='d' d='M30 98h6M54 98h12M84 98h6'/>",
  "stairs": "<path d='M15 100V80h22V60h22V40h22V20h24'/><path d='M78 20h27v27M105 20 70 55'/><path d='M15 109h90'/>",
- "home": "<path d='m10 55 50-42 50 42M22 48v58h76V48M48 106V70h24v36'/>",
+ "home": "<path d='M6 58 60 10l54 48'/><path class='f' d='M20 50v58h80V50L60 14Z'/><rect class='d' x='47' y='72' width='26' height='36' rx='4'/><circle class='d' cx='60' cy='46' r='8'/>",
  "warning": "<path class='f' d='M60 12 110 104H10Z'/><path d='M60 42v29'/><circle cx='60' cy='86' r='4' fill='currentColor'/>",
- "star": "<path class='f' d='m60 10 15 32 35 5-25 24 6 36-31-17-31 17 6-36L10 47l35-5Z'/>",
+ "star": "<path class='f' d='M60 12 L72.3 45 L107.6 46.5 L80 68.5 L89.4 102.5 L60 83 L30.6 102.5 L40 68.5 L12.4 46.5 L47.7 45Z'/><path class='d' d='M60 34 L67.1 52.3 L86.6 53.3 L71.4 65.7 L76.5 84.7 L60 74 L43.5 84.7 L48.6 65.7 L33.4 53.3 L52.9 52.3Z'/>",
  "car": "<path class='f' d='m18 70 10-30h64l10 30v25H18Z'/><path d='M28 40 40 20h40l12 20M18 70h84M32 95v10M88 95v10'/><circle cx='34' cy='75' r='7'/><circle cx='86' cy='75' r='7'/>",
  "mask": "<path class='f' d='M18 38Q60 8 102 38v28Q60 108 18 66Z'/><path d='M28 51q14-12 28 0M64 51q14-12 28 0M35 72q25 17 50 0'/><path d='M18 42 9 35M102 42l9-7' />",
  "ear": "<path d='M31 61V48c0-21 13-35 31-35s31 14 31 34c0 17-10 23-19 32-6 6-7 15-15 20-11 7-24-1-24-13'/><path d='M48 51c0-9 6-15 14-15s14 6 14 14c0 9-7 13-13 19-4 4-4 10-9 13'/><path d='M42 91q-2 12 9 16' />",
  "sleep_symbol": "<path d='M18 28h34L18 61h35M65 16h37L65 53h37M48 76h55L48 111h55'/><path class='f' d='m20 12 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z'/> ",
  "traffic_light": "<rect class='f' x='37' y='10' width='46' height='91' rx='12'/><circle cx='60' cy='31' r='10'/><circle cx='60' cy='56' r='10'/><circle cx='60' cy='81' r='10'/><path d='M60 101v10M48 111h24'/>",
- "banknote": "<rect class='f' x='10' y='27' width='100' height='66' rx='8'/><path d='M22 27q0 14-12 14M98 27q0 14 12 14M22 93q0-14-12-14M98 93q0-14 12-14'/><circle cx='60' cy='60' r='19'/><path d='M66 48c-12-8-22 5-10 11 13 6 3 20-10 11M60 43v34'/>",
+ "banknote": "<rect class='f' x='6' y='28' width='108' height='64' rx='9'/><rect class='d' x='15' y='37' width='90' height='46' rx='5'/><circle class='f' cx='60' cy='60' r='16'/><circle class='d' cx='60' cy='60' r='9'/><g class='s'><circle cx='27' cy='48' r='3.5'/><circle cx='93' cy='48' r='3.5'/><circle cx='27' cy='72' r='3.5'/><circle cx='93' cy='72' r='3.5'/></g><path class='d' d='M36 60h10M74 60h10'/>",
  "road": "<path d='M37 110 49 10M83 110 71 10'/><path d='M60 16v17M60 48v18M60 83v18'/><path d='M37 110h46'/>",
  "airplane": "<path class='f' d='M60 8 70 51l38 21v12L69 73l-3 27 12 9v6l-18-6-18 6v-6l12-9-3-27-39 11V72l38-21Z'/><path d='M49 49h22'/>",
  "train": "<rect class='f' x='25' y='12' width='70' height='86' rx='16'/><path d='M25 62h70M39 28h16v19H39ZM65 28h16v19H65ZM39 98l-10 13M81 98l10 13M39 82h42'/><circle cx='42' cy='70' r='4'/><circle cx='78' cy='70' r='4'/>",
@@ -468,9 +472,9 @@ ICONS = {
  "motorcycle": "<circle cx='28' cy='86' r='18'/><circle cx='94' cy='86' r='18'/><path d='m28 86 23-34h22l21 34H60L48 65M51 52h-9M72 52l10-12h12M60 86l-9-34'/><path d='M78 36h15'/>",
  "building": "<path d='M18 108V20h84v88M18 42h84M18 64h84M18 86h84'/><path d='M31 30h8M53 30h8M75 30h8M31 52h8M53 52h8M75 52h8M31 74h8M53 74h8M75 74h8M49 108V91h22v17'/>",
  "dumbbell": "<path d='M12 43v34M25 32v56M25 60h70M95 32v56M108 43v34'/><path d='M12 60h13M95 60h13'/>",
- "location": "<path class='f' d='M60 110S22 68 22 46a38 38 0 1 1 76 0c0 22-38 64-38 64Z'/><circle cx='60' cy='46' r='13'/>",
- "wallet": "<rect class='f' x='12' y='34' width='96' height='66' rx='12'/><path d='M24 34 78 16c6-2 10 2 10 8v10'/><path class='f' d='M78 58h30v24H78a12 12 0 0 1 0-24Z'/><circle class='s' cx='88' cy='70' r='4'/><path class='d' d='M24 48h40M24 60h22'/>",
- "coins": "<ellipse class='f' cx='60' cy='32' rx='32' ry='12'/><path d='M28 32v18c0 7 14 12 32 12s32-5 32-12V32M28 50v18c0 7 14 12 32 12s32-5 32-12V50M28 68v18c0 7 14 12 32 12s32-5 32-12V68'/><ellipse class='d' cx='60' cy='32' rx='19' ry='6'/>",
+ "location": "<path class='f' d='M60 112C38 86 22 70 22 50a38 38 0 0 1 76 0c0 20-16 36-38 62Z'/><circle class='d' cx='60' cy='50' r='15'/><circle class='s' cx='60' cy='50' r='5'/>",
+ "wallet": "<rect class='d' x='20' y='14' width='66' height='34' rx='6'/><rect class='f' x='8' y='32' width='104' height='72' rx='13'/><path class='d' d='M20 46h58' stroke-dasharray='5 6'/><path class='f' d='M82 58h30v30H82a15 15 0 0 1 0-30Z'/><circle class='s' cx='96' cy='73' r='4.5'/><path class='d' d='M20 92h50' stroke-dasharray='5 6'/>",
+ "coins": "<ellipse class='f' cx='60' cy='30' rx='36' ry='13'/><ellipse class='d' cx='60' cy='30' rx='23' ry='7.5'/><path d='M24 30v20c0 7 16 13 36 13s36-6 36-13V30M24 50v20c0 7 16 13 36 13s36-6 36-13V50M24 70v20c0 7 16 13 36 13s36-6 36-13V70'/><path class='d' d='M40 66v9M60 70v9M80 66v9M40 86v9M60 90v9M80 86v9'/><path class='s' d='M56 28h8v4h-8z'/>",
  "piggy": "<path class='f' d='M22 66c0-20 16-34 38-34 8 0 14 2 20 5l14-7-3 17c5 4 8 10 8 17 0 8-4 13-10 17v12H74v-7H48v7H36V86C27 80 22 74 22 66Z'/><circle class='s' cx='84' cy='58' r='3.5'/><path class='d' d='M50 44h24'/><circle class='f' cx='62' cy='16' r='8'/><path class='d' d='M62 12v8'/>",
  "bank": "<path class='f' d='M10 44 60 14l50 30Z'/><path d='M24 54v38M44 54v38M76 54v38M96 54v38M14 100h92M8 110h104'/><circle class='d' cx='60' cy='34' r='7'/>",
  "card": "<rect class='f' x='10' y='26' width='100' height='68' rx='11'/><path d='M10 46h100'/><rect class='d' x='22' y='62' width='22' height='16' rx='4'/><path class='d' d='M56 70h14M76 70h14M56 82h34'/>",
@@ -557,7 +561,7 @@ ICONS = {
  "turtle": "<path class='f' d='M20 80c0-26 18-42 42-42s42 16 42 42Z'/><path class='d' d='M62 38v42M38 50l14 14M86 50 72 64'/><path d='M104 80c4-10 8-14 14-12M30 80v14M80 80v14M20 80c-6 2-10 6-12 12'/>",
  "bookmark": "<path class='f' d='M30 10h60v100L60 84 30 110Z'/><path class='d' d='M46 32h28'/>",
  "user_plus": "<circle class='f' cx='46' cy='34' r='18'/><path class='f' d='M8 106c0-22 16-38 38-38s38 16 38 38Z'/><path d='M96 38v28M82 52h28'/>",
- "dollar": "<circle class='f' cx='60' cy='60' r='48'/><path d='M60 24v72M80 46c-4-8-12-12-20-12-12 0-20 6-20 14 0 20 40 10 40 30 0 8-8 14-20 14-8 0-16-4-20-12'/>",
+ "dollar": "<circle class='f' cx='60' cy='60' r='50'/><circle class='d' cx='60' cy='60' r='41'/><path d='M60 22v76M81 45c-4-8-12-12-21-12-12 0-21 6-21 14 0 20 42 10 42 30 0 8-9 14-21 14-9 0-17-4-21-12'/>",
  "newspaper": "<rect class='f' x='12' y='20' width='96' height='80' rx='8'/><path class='d' d='M26 36h40v28H26ZM76 36h20M76 50h20M26 78h70M26 90h50'/>",
  "map": "<path class='f' d='M10 24 40 12l40 12 30-12v84L80 108 40 96 10 108Z'/><path class='d' d='M40 12v84M80 24v84'/>",
  "send": "<path class='f' d='M10 56 110 10 80 108 58 78Z'/><path d='M58 78 110 10M58 78 56 104 72 90'/>",
@@ -611,8 +615,8 @@ KEYWORDS = {
  "piggy": [
   "کنار می گذارد",
   "کنار بگذار",
-  "ذخیره پول",
   "صرفه جویی",
+  "ذخیره پول",
   "پس انداز",
   "پسانداز",
   "کنار",
@@ -857,8 +861,8 @@ KEYWORDS = {
  ],
  "sleep_symbol": [
   "خواب آلودگی",
-  "خواب آلود",
   "نماد خواب",
+  "خواب آلود",
   "zzz"
  ],
  "target": [
@@ -893,8 +897,8 @@ KEYWORDS = {
   "پشتکار"
  ],
  "stairs": [
-  "گام به گام",
   "قدم به قدم",
+  "گام به گام",
   "به تدریج",
   "گام",
   "قدم",
@@ -1527,8 +1531,8 @@ KEYWORDS = {
   "شخصیت"
  ],
  "blockchain": [
-  "smart contract",
   "قرارداد هوشمند",
+  "smart contract",
   "بلاکچین",
   "بلاک",
   "چین",
@@ -2041,10 +2045,10 @@ KEYWORDS = {
   "سیو"
  ],
  "user_plus": [
-  "همراه شو",
   "دنبال کن",
-  "ثبت نام",
+  "همراه شو",
   "فالو کن",
+  "ثبت نام",
   "عضو شو",
   "فالو",
   "پیوستن",
@@ -2415,7 +2419,7 @@ def icon_svg(kind, size=300):
 
 # ------------------------------------------------------------------ HTML layouts
 def font_setup(d):
-    """Offline font if ./fonts exists (copied next to the pages), else Google Fonts."""
+    """Offline fonts if ./fonts exists (Lalezar / Vazirmatn / Estedad files), else Google Fonts."""
     src = Path(__file__).resolve().parent / "fonts"
     files = [p for p in sorted(src.glob("*")) if p.suffix.lower() in {".ttf", ".otf", ".woff", ".woff2"}] if src.is_dir() else []
     if not files:
@@ -2427,9 +2431,10 @@ def font_setup(d):
     for p in files:
         shutil.copy(p, d / "fonts" / p.name)
         low = p.name.lower()
-        weight = next((w for k, w in weights if k in low), 400)
+        family = "Lalezar" if "lalezar" in low else "Estedad" if "estedad" in low else "Vazirmatn"
+        weight = 400 if family == "Lalezar" else next((w for k, w in weights if k in low), 400)
         fmt = {".ttf": "truetype", ".otf": "opentype", ".woff": "woff", ".woff2": "woff2"}[p.suffix.lower()]
-        css += (f"@font-face{{font-family:'Estedad';src:url('fonts/{p.name}') format('{fmt}');"
+        css += (f"@font-face{{font-family:'{family}';src:url('fonts/{p.name}') format('{fmt}');"
                 f"font-weight:{weight};font-display:block}}")
     return "", css
 
@@ -2464,14 +2469,8 @@ def highlight_html(text, words):
 
 
 def bg_layers(variant):
-    rnd = random.Random(variant * 131 + 7)
-    dots = ""
-    for _ in range(16):
-        sz = rnd.randint(14, 64)
-        dots += (f"<i style='left:{rnd.randint(30, 1010)}px;top:{rnd.randint(100, 1800)}px;"
-                 f"width:{sz}px;height:{sz}px;opacity:{rnd.uniform(.25, .75):.2f}'></i>")
     return (f"<div class='base'></div><div class='art a{variant % 4}'></div><div class='glow'></div>"
-            f"<div class='bokeh'>{dots}</div><div class='vig'></div>")
+            f"<div class='vig'></div>")
 
 
 def base_css(font_css, transparent):
@@ -2546,13 +2545,23 @@ def brand_html(font_head, font_css):
     return page(brand_div(), base_css(font_css, True), font_head)
 
 
+def bokeh_html(variant, font_head, font_css):
+    rnd = random.Random(variant * 131 + 7)
+    dots = ""
+    for _ in range(18):
+        sz = rnd.randint(14, 66)
+        dots += (f"<i style='left:{rnd.randint(20, 1020)}px;top:{rnd.randint(60, 1860)}px;"
+                 f"width:{sz}px;height:{sz}px;opacity:{rnd.uniform(.25, .8):.2f}'></i>")
+    return page(f"<div class='bokeh'>{dots}</div>", base_css(font_css, True), font_head)
+
+
 def sub_html(text, kind, variant, font_head, font_css, stat=None):
     """One slide: icon (or big number) layer + subtitle layer, rendered separately for motion.
     Layout modes: card (default), punch (very short line, no box), stat (big number)."""
     text = clean_display(text)
     n = len(text)
     punch = n <= 24 and not stat
-    size = (118 if n < 14 else 104) if punch else 92 if n < 22 else 82 if n < 34 else 74 if n < 46 else 66 if n < 54 else 60
+    size = (124 if n < 14 else 108) if punch else 92 if n < 22 else 82 if n < 34 else 74 if n < 46 else 66 if n < 54 else 60
     safe = highlight_html(text, pick_keywords(text, 1))
     css = (base_css(font_css, True) +
            f".card{{position:relative;width:{CONTENT_W}px;box-sizing:border-box;"
@@ -2563,11 +2572,12 @@ def sub_html(text, kind, variant, font_head, font_css, stat=None):
            f"box-shadow:0 28px 60px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.12)}}"
            f".card:before{{content:'';position:absolute;top:-3px;left:50%;width:120px;height:6px;margin-left:-60px;"
            f"border-radius:6px;background:linear-gradient(90deg,rgba(242,169,0,0),{YELLOW},rgba(242,169,0,0))}}"
-           f".card.punch{{background:none;border:none;box-shadow:none;padding:10px 20px;font-weight:800;"
-           f"text-shadow:0 6px 30px rgba(0,0,0,.85),0 0 40px rgba(242,169,0,.12)}}"
+           f".card.punch{{background:none;border:none;box-shadow:none;padding:10px 20px;font-family:{DISPLAY};"
+           f"font-weight:400;line-height:1.35;text-shadow:0 6px 30px rgba(0,0,0,.85),0 0 40px rgba(242,169,0,.14)}}"
+           f".card.punch .kw{{font-weight:400}}"
            f".card.punch:before{{display:none}}"
-           f".stat{{font-size:230px;font-weight:800;line-height:1.1;color:{YELLOW};text-align:center;direction:rtl;"
-           f"height:400px;display:flex;align-items:center;justify-content:center;"
+           f".stat{{font-family:{DISPLAY};font-size:250px;font-weight:400;line-height:1.1;color:{YELLOW};text-align:center;"
+           f"direction:rtl;height:400px;display:flex;align-items:center;justify-content:center;"
            f"text-shadow:0 0 70px rgba(242,169,0,.40),0 10px 30px rgba(0,0,0,.6)}}")
     top = (f"<div class='stat' data-layer='icon'>{html.escape(stat)}</div>" if stat else
            f"<div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 270 if not punch else 230)}</div>")
@@ -2577,52 +2587,68 @@ def sub_html(text, kind, variant, font_head, font_css, stat=None):
 
 
 def cover_html(hook, kind, variant, teaser, font_head, font_css):
-    """Poster-style hook screen (also the thumbnail): chip + icon + huge headline."""
+    """Poster-style hook screen (also the thumbnail): chip + icon + huge headline.
+    Layers: chip / icon / hl animate in the video; the full page is the thumbnail."""
     sub = clean_display(hook)
     n = len(sub)
-    size = 150 if n <= 16 else 132 if n <= 28 else 112 if n <= 44 else 96 if n <= 64 else 82
+    size = 160 if n <= 16 else 140 if n <= 28 else 120 if n <= 44 else 104 if n <= 64 else 88
     css = (base_css(font_css, False) +
            f".stage{{gap:34px;text-align:center}}"
            f".chip{{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#FFD35C,{YELLOW});"
            f"color:#14110a;border-radius:44px;padding:12px 38px;font-size:42px;font-weight:800;"
            f"box-shadow:0 10px 40px rgba(242,169,0,.35)}}"
            f".chip .ico{{stroke:#14110a}}.chip .ico .f{{fill:rgba(20,17,10,.12)}}.chip .ico .d{{stroke:#14110a}}.chip .ico .s{{fill:#14110a}}"
-           f".hl{{font-size:{size}px;font-weight:800;line-height:1.38;max-width:{CONTENT_W}px;text-wrap:balance;"
-           f"text-shadow:0 8px 40px rgba(0,0,0,.8)}}"
-           f".rule{{width:{140 + (variant % 4) * 26}px;height:6px;border-radius:8px;"
+           f".hl{{font-family:{DISPLAY};font-size:{size}px;font-weight:400;line-height:1.32;max-width:{CONTENT_W}px;"
+           f"text-wrap:balance;text-shadow:0 8px 40px rgba(0,0,0,.8)}}"
+           f".hl .kw{{font-weight:400}}"
+           f".hl:after{{content:'';display:block;width:{140 + (variant % 4) * 26}px;height:6px;margin:26px auto 0;border-radius:8px;"
            f"background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
            f".halo{{width:380px;height:380px}}")
-    chip = (f"<div class='chip'>{icon_svg('stopwatch', 52)}<span>{html.escape(teaser)}</span></div>" if teaser else "")
+    chip = (f"<div class='chip' data-layer='chip'>{icon_svg('stopwatch', 52)}<span>{html.escape(teaser)}</span></div>"
+            if teaser else "")
     body = (f"{brand_div()}<div class='stage'>{chip}"
-            f"<div class='halo h{variant % 4}'>{icon_svg(kind, 260)}</div>"
-            f"<div class='hl'>{highlight_html(sub, pick_keywords(sub, 2))}</div><div class='rule'></div></div>")
+            f"<div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 260)}</div>"
+            f"<div class='hl' data-layer='hl'>{highlight_html(sub, pick_keywords(sub, 2))}</div></div>")
     return page(body, css, font_head, bg=0)
 
 
 def outro_html(font_head, font_css):
     css = (base_css(font_css, False) +
            f".stage{{gap:30px;text-align:center}}"
-           f".slogan{{font-size:76px;font-weight:800;line-height:1.5;color:{YELLOW};max-width:{CONTENT_W}px;"
+           f".slogan{{font-family:{DISPLAY};font-size:90px;font-weight:400;line-height:1.4;color:{YELLOW};max-width:{CONTENT_W}px;"
            f"text-wrap:balance;text-shadow:0 0 36px rgba(242,169,0,.32)}}"
-           f".rule{{width:160px;height:6px;border-radius:8px;background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
+           f".slogan:after{{content:'';display:block;width:160px;height:6px;margin:22px auto 0;border-radius:8px;"
+           f"background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
            f".cta{{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:14px}}"
            f".pill{{display:flex;align-items:center;gap:18px;background:linear-gradient(180deg,rgba(26,26,34,.96),rgba(12,12,18,.98));"
            f"color:#f3f4f6;border:2px solid rgba(242,169,0,.45);border-radius:70px;padding:16px 44px;font-size:50px;"
            f"font-weight:700;box-shadow:0 14px 40px rgba(0,0,0,.6)}}")
-    pills = "".join(f"<div class='pill'>{icon_svg(k, 64)}<span>{html.escape(t)}</span></div>" for k, t in CTA_ITEMS)
-    body = (f"{brand_div()}<div class='stage'><div class='slogan'>{html.escape(SLOGAN)}</div><div class='rule'></div>"
+    pills = "".join(f"<div class='pill' data-layer='p{i}'>{icon_svg(k, 64)}<span>{html.escape(t)}</span></div>"
+                    for i, (k, t) in enumerate(CTA_ITEMS))
+    body = (f"{brand_div()}<div class='stage'><div class='slogan' data-layer='slogan'>{html.escape(SLOGAN)}</div>"
             + (f"<div class='cta'>{pills}</div>" if pills else "") + "</div>")
     return page(body, css, font_head, bg=2)
 
 
-_LAYER_JS = ("(layer) => document.querySelectorAll('[data-layer]').forEach(e => "
-             "{ e.style.visibility = (layer === null || e.dataset.layer === layer) ? 'visible' : 'hidden'; })")
+_LAYER_JS = """(layer) => {
+  const only = layer !== null && layer !== '__none__';
+  document.querySelectorAll('[data-layer]').forEach(e => {
+    e.style.visibility = (layer === null || e.dataset.layer === layer) ? 'visible' : 'hidden'; });
+  document.querySelectorAll('.base,.art,.glow,.vig,.brand').forEach(e => {
+    e.style.visibility = only ? 'hidden' : 'visible'; });
+  document.documentElement.style.background = document.body.style.background = only ? 'transparent' : '';
+}"""
+_BOX_JS = ("(layer) => { const e = document.querySelector(`[data-layer='${layer}']`); const r = e.getBoundingClientRect();"
+           " return [r.x, r.y, r.width, r.height]; }")
 
 
 async def render_pages(jobs, d):
-    """jobs: [(html, [(out_png, layer_or_None, transparent), ...]), ...]; pages load from
-    files so the background / fonts are read from disk instead of being re-sent every time."""
+    """jobs: [(html, [(out_png, layer, transparent, clip), ...]), ...]
+    layer None = whole page, '-' = page without any layer, else only that data-layer.
+    clip=True crops the PNG to the layer's box (+margin) so it can be animated cheaply.
+    Returns {out_png: (x, y, w, h)} for clipped layers."""
     from playwright.async_api import async_playwright
+    boxes = {}
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         try:
@@ -2632,16 +2658,41 @@ async def render_pages(jobs, d):
                 f.write_text(content, encoding="utf-8")
                 await page_.goto(f.as_uri(), wait_until="load")
                 await page_.evaluate("document.fonts.ready.then(() => true)")
-                for out, layer, transparent in outs:
-                    await page_.evaluate(_LAYER_JS, layer)
-                    await page_.screenshot(path=str(out), omit_background=transparent)
+                for out, layer, transparent, clip in outs:
+                    await page_.evaluate(_LAYER_JS, layer if layer != "-" else "__none__")
+                    if clip and layer not in (None, "-"):
+                        x, y, w, h = await page_.evaluate(_BOX_JS, layer)
+                        m = 70
+                        x0, y0 = max(int(x - m), 0), max(int(y - m), 0)
+                        x1, y1 = min(int(x + w + m), W), min(int(y + h + m), H)
+                        await page_.screenshot(path=str(out), omit_background=transparent,
+                                               clip={"x": x0, "y": y0, "width": x1 - x0, "height": y1 - y0})
+                        boxes[out] = (x0, y0, x1 - x0, y1 - y0)
+                    else:
+                        await page_.screenshot(path=str(out), omit_background=transparent)
         finally:
             await browser.close()
+    return boxes
 
 
 # ------------------------------------------------------------------ video assembly
-def scene_video(idx, bg_png, brand_png, subs, dur, is_last, out, cover=False):
-    """bg (zoom/pan, alternating) + static brand + per-sentence icon/card layers sliding in."""
+def _anim(style, s):
+    """Overlay animation expressions (size factor, y offset) for a layer starting at time s."""
+    p = f"min(max((t-({s:.3f}))/{RISE_T + 0.1:.2f},0),1)"
+    e3 = f"(1-pow(1-{p},3))"
+    back = f"(1+2.70158*pow({p}-1,3)+1.70158*pow({p}-1,2))"
+    if not ANIM:
+        return "1", "0"
+    if style == "pop":
+        return f"(0.5+0.5*{back})", "0"
+    if style == "drop":
+        return f"(0.9+0.1*{e3})", f"(-56*(1-{e3}))"
+    return f"(0.93+0.07*{e3})", f"(46*(1-{e3}))"          # rise
+
+
+def scene_video(idx, bg_png, brand_png, bokeh_png, layers, dur, is_last, out, cover=False):
+    """bg (zoom/pan, alternating) + drifting bokeh + static brand + animated layers.
+    layers: [(png, (x,y,w,h), start, end, style, anim_start)]"""
     length = dur + (0 if is_last else XFADE)
     frames = int(length * FPS) + 2
     f = f"on/{frames}"
@@ -2653,25 +2704,32 @@ def scene_video(idx, bg_png, brand_png, subs, dur, is_last, out, cover=False):
         z = f"1+{ZOOM_END}*(1-{f})"
     pan = 36 * (1 if idx % 2 else -1)
     cmd = ["ffmpeg", "-y", "-i", str(bg_png)]
-    if brand_png:
-        cmd += ["-loop", "1", "-t", f"{length:.3f}", "-i", str(brand_png)]
-    for icon_png, card_png, a, b in subs:      # each layer only decodes during its own time window
-        for png in (icon_png, card_png):
-            cmd += ["-itsoffset", f"{a:.3f}", "-loop", "1", "-t", f"{b - a + 0.05:.3f}", "-i", str(png)]
+    static = [p for p in (bokeh_png, brand_png) if p]
+    for png in static:                           # decoded once, repeated in memory
+        cmd += ["-i", str(png)]
+    for png, box, a, b, style, s in layers:      # each layer only decodes during its own window
+        cmd += ["-itsoffset", f"{a:.3f}", "-loop", "1", "-t", f"{b - a + 0.05:.3f}", "-i", str(png)]
     fc = (f"[0:v]scale={int(W * 1.5)}:{int(H * 1.5)},zoompan=z='{z}':x='iw/2-(iw/zoom/2)+({pan})*({f}-0.5)':"
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last, k = "v0", 1
+    if bokeh_png:
+        ph = (idx * 1.3) % 6.28
+        fc += (f";[{k}:v]loop=loop=-1:size=1,setpts=N/{FPS}/TB,format=rgba[bk];"
+               f"[{last}][bk]overlay=x='30*sin(t*0.7+{ph:.2f})':y='34*sin(t*0.45+{ph:.2f})':eof_action=pass[vk]")
+        last, k = "vk", k + 1
     if brand_png:
-        fc += f";[{k}:v]format=rgba[br];[{last}][br]overlay=0:0[vb]"
+        fc += (f";[{k}:v]loop=loop=-1:size=1,setpts=N/{FPS}/TB,format=rgba[br];"
+               f"[{last}][br]overlay=0:0:eof_action=pass[vb]")
         last, k = "vb", k + 1
-    for icon_png, card_png, a, b in subs:
-        for rise, delay, fade in ((44, 0.0, 0.16), (30, 0.07, 0.20)):
-            fd = min(fade, max(0.08, (b - a) / 4.0))
-            s0 = a + delay
-            fc += (f";[{k}:v]format=rgba,fade=t=in:st={s0:.3f}:d={fd:.3f}:alpha=1[l{k}]"
-                   f";[{last}][l{k}]overlay=x=0:y='{rise}*pow(1-min(max((t-{s0:.3f})/{RISE_T},0),1),3)':"
-                   f"eof_action=pass:enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
-            last, k = f"v{k}", k + 1
+    for png, (bx, by, bw, bh), a, b, style, s in layers:
+        size_f, y_off = _anim(style, s)
+        fd = 0 if cover else min(0.16, max(0.08, (b - a) / 4.0))
+        fade = f",fade=t=in:st={a:.3f}:d={fd:.3f}:alpha=1" if fd else ""
+        fc += (f";[{k}:v]format=rgba{fade},scale=w='2*trunc(iw*{size_f}/2)':h=-2:eval=frame[l{k}]"
+               f";[{last}][l{k}]overlay=x='{bx}+({bw}-overlay_w)/2':"
+               f"y='{by}+({bh}-overlay_h)/2+{y_off}':eof_action=pass:"
+               f"enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
+        last, k = f"v{k}", k + 1
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "14",
             "-pix_fmt", "yuv420p", "-r", str(FPS), str(out)]
@@ -2727,16 +2785,18 @@ def assemble(clips, durs, voice_wav, sfx_wav, bed, bed_is_music, out):
     voice_chain = ("highpass=f=70,equalizer=f=3200:t=q:w=1.2:g=2,"
                    "acompressor=threshold=-18dB:ratio=3:attack=8:release=120:makeup=2")
     parts, mix_in = [], ["[v1]"]
+    if bed or sfx_wav:
+        fc += f"[{vi}:a]{voice_chain},asplit=3[v1][v2][v3];"
     if bed:
-        fc += f"[{vi}:a]{voice_chain},asplit=2[v1][v2];"
         vol = MUSIC_VOLUME if bed_is_music else BED_VOLUME
         fc += (f"[{bi}:a]volume={vol},afade=t=in:d=1,afade=t=out:st={max(total - 1.5, 0):.3f}:d=1.5[b0];"
                f"[b0][v2]sidechaincompress=threshold=0.015:ratio=12:attack=20:release=450[bd];")
         mix_in.append("[bd]")
-    else:
+    if not (bed or sfx_wav):
         fc += f"[{vi}:a]{voice_chain}[v1];"
-    if sfx_wav:
-        fc += f"[{si}:a]volume={SFX_VOLUME}[sf];"
+    if sfx_wav:   # effects also duck under the voice, so no word is ever covered
+        fc += (f"[{si}:a]volume={SFX_VOLUME}[sf0];"
+               f"[sf0][v3]sidechaincompress=threshold=0.01:ratio=20:attack=5:release=250[sf];")
         mix_in.append("[sf]")
     fc += (f"{''.join(mix_in)}amix=inputs={len(mix_in)}:duration=first:normalize=0,"
            f"loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
@@ -2805,31 +2865,35 @@ async def build(hook, scenes, d, dst, tag=None):
     kind_iter = iter(kinds)
 
     # ---- cover / hook poster (unique pixels vs. previous covers)
-    teaser = ""
-    if TEASERS:
-        secs = str(round(total)).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
-        teaser = f"{secs} ثانیه · {TEASERS[int(hashlib.md5(hook.encode()).hexdigest(), 16) % len(TEASERS)]}"
-    cover_png = d / "cover.png"
+    teaser = TEASERS[int(hashlib.md5(hook.encode()).hexdigest(), 16) % len(TEASERS)] if TEASERS else ""
+    cover_png, cover_bg = d / "cover.png", d / "cover_bg.png"
+    cover_layers = {name: d / f"cover_{name}.png" for name in ("chip", "icon", "hl")}
     history_dir = dst.parent / ".cover_history"
     history_dir.mkdir(parents=True, exist_ok=True)
     known = {hashlib.sha256(p.read_bytes()).hexdigest() for p in history_dir.glob("*.png")}
     start_variant = random.SystemRandom().randrange(0, 12)
+    cover_boxes = {}
     for attempt in range(12):
         variant = (start_variant + attempt) % 12
-        await render_pages([(cover_html(hook, cover_kind, variant, teaser, font_head, font_css),
-                             [(cover_png, None, False)])], d)
+        outs = [(cover_png, None, False, False), (cover_bg, "-", False, False)]
+        outs += [(p, name, True, True) for name, p in cover_layers.items() if not (name == "chip" and not teaser)]
+        cover_boxes = await render_pages([(cover_html(hook, cover_kind, variant, teaser, font_head, font_css), outs)], d)
         if hashlib.sha256(cover_png.read_bytes()).hexdigest() not in known:
             break
     else:
         print("[warn] could not make a pixel-unique cover; using the last variant.")
     (history_dir / f"{hashlib.sha256(cover_png.read_bytes()).hexdigest()[:16]}.png").write_bytes(cover_png.read_bytes())
 
-    # ---- page jobs: 4 background variants, brand, outro, slides
+    # ---- page jobs: 4 background variants, drifting bokeh, brand, outro, slides
     bg_pngs = [d / f"bg{v}.png" for v in range(4)]
-    brand_png, outro_png = d / "brand.png", d / "outro.png"
-    jobs = [(bg_html(v, font_head, font_css), [(bg_pngs[v], None, False)]) for v in range(4)]
-    jobs += [(brand_html(font_head, font_css), [(brand_png, None, True)]),
-             (outro_html(font_head, font_css), [(outro_png, None, False)])]
+    bokeh_pngs = [d / f"bokeh{v}.png" for v in range(4)]
+    brand_png, outro_png, outro_bg = d / "brand.png", d / "outro.png", d / "outro_bg.png"
+    outro_layers = {"slogan": d / "o_slogan.png", **{f"p{i}": d / f"o_p{i}.png" for i in range(len(CTA_ITEMS))}}
+    jobs = [(bg_html(v, font_head, font_css), [(bg_pngs[v], None, False, False)]) for v in range(4)]
+    jobs += [(bokeh_html(v, font_head, font_css), [(bokeh_pngs[v], None, True, False)]) for v in range(4)]
+    jobs += [(brand_html(font_head, font_css), [(brand_png, None, True, False)]),
+             (outro_html(font_head, font_css), [(outro_png, None, False, False), (outro_bg, "-", False, False)]
+              + [(p, name, True, True) for name, p in outro_layers.items()])]
     slide_rows, slide_no = [[]], 0
     for k, sh in enumerate(shots, start=1):
         stat_m = STAT_RE.match(sh["title"].strip()) if sh["title"] else None
@@ -2839,23 +2903,41 @@ async def build(hook, scenes, d, dst, tag=None):
             kind = next(kind_iter)
             stat = sh["title"].strip() if (stat_m and j == 0) else None
             jobs.append((sub_html(txt, kind, slide_no, font_head, font_css, stat=stat),
-                         [(ip, "icon", True), (cp, "card", True)]))
+                         [(ip, "icon", True, True), (cp, "card", True, True)]))
             row.append((ip, cp, a, b))
             slide_no += 1
         slide_rows.append(row)
     slide_rows.append([])
-    await render_pages(jobs, d)
+    boxes = await render_pages(jobs, d)
+    boxes.update(cover_boxes)
 
-    # ---- clips
+    # ---- clips (every layer = clipped PNG + box + window + motion style)
     clips = []
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
         if i == 0:
-            scene_video(i, cover_png, None, [], durs[i], False, clip, cover=True)
+            lay = []
+            for name, style in (("chip", "drop"), ("icon", "pop"), ("hl", "rise")):
+                p = cover_layers[name]
+                if p in boxes:
+                    lay.append((p, boxes[p], 0.0, durs[0], style, -0.30))
+            scene_video(i, cover_bg, None, bokeh_pngs[0], lay, durs[0], False, clip, cover=True)
         elif i == n - 1:
-            scene_video(i, outro_png, None, [], durs[i], True, clip)
+            lay, t0 = [], 0.15
+            if outro_layers["slogan"] in boxes:
+                lay.append((outro_layers["slogan"], boxes[outro_layers["slogan"]], 0.0, durs[i], "rise", 0.0))
+            for pi in range(len(CTA_ITEMS)):
+                p = outro_layers[f"p{pi}"]
+                if p in boxes:
+                    t_in = 0.35 + 0.22 * pi
+                    lay.append((p, boxes[p], t_in, durs[i], "pop", t_in))
+            scene_video(i, outro_bg, None, bokeh_pngs[2], lay, durs[i], True, clip)
         else:
-            scene_video(i, bg_pngs[(i - 1) % 4], brand_png, slide_rows[i], durs[i], False, clip)
+            lay = []
+            for ip, cp, a, b in slide_rows[i]:
+                lay.append((ip, boxes[ip], a, b, "pop", a))
+                lay.append((cp, boxes[cp], a, b, "rise", a + 0.07))
+            scene_video(i, bg_pngs[(i - 1) % 4], brand_png, bokeh_pngs[(i - 1) % 4], lay, durs[i], False, clip)
         clips.append(clip)
 
     # ---- sound: voice + sfx + ducked bed
@@ -2865,14 +2947,10 @@ async def build(hook, scenes, d, dst, tag=None):
     sfx_wav = bed = None
     bed_is_music = False
     if SFX:
-        events = [(0.0, "impact")]
+        events = [(0.0, "impact")]                          # voice starts after OPENING_LEAD
         for i in range(1, n):
-            events.append((starts[i] - 0.10, "whoosh"))
-            if i == n - 1:
-                events.append((starts[i] + 0.25, "ding"))
-            for j, (_, a, _) in enumerate(audio[i][1]):
-                if j > 0:
-                    events.append((starts[i] + a, "pop"))
+            events.append((max(starts[i] - 0.5, 0.0), "whoosh"))   # ends right before the new scene's voice
+        events.append((max(total - 1.4, 0.0), "ding"))              # after the spoken CTA
         sfx_wav = d / "sfx.wav"
         make_sfx(events, total, sfx_wav)
     music = pick_music(hook)
