@@ -32,6 +32,7 @@ import hashlib
 import html
 import json
 import math
+import os
 import random
 import re
 import shutil
@@ -75,6 +76,7 @@ RATE = "+0%"                     # speaking rate, e.g. "+5%"
 MAX_REEL_SECONDS = 60            # warn when the reel is longer
 SHOW_PROGRESS = True             # thin RTL progress bar above the content
 HOOK_SPEAK = True                # speak the full hook on the cover
+HOOK_RATE, HOOK_PITCH = "+4%", "+2Hz"   # slightly more energetic delivery for the hook only
 SFX = True                       # whoosh / pop / impact / ding
 BED = True                       # ambient bed (or mp3/wav from ./music) ducked under voice
 BED_VOLUME = 0.55
@@ -213,7 +215,7 @@ def split_chunks(text, max_chars=MAX_CHARS):
 
 
 # ------------------------------------------------------------------ Edge-TTS / audio
-async def tts(text, out_wav, retries=4):
+async def tts(text, out_wav, retries=4, rate=None, pitch=None):
     """Generate speech robustly; Edge-TTS occasionally returns an empty stream."""
     text = (text or "").strip()
     if not text:
@@ -223,7 +225,7 @@ async def tts(text, out_wav, retries=4):
     for attempt in range(retries):
         try:
             out_wav.unlink(missing_ok=True)
-            communicate = edge_tts.Communicate(text, VOICE, rate=RATE)
+            communicate = edge_tts.Communicate(text, VOICE, rate=rate or RATE, pitch=pitch or "+0Hz")
             await asyncio.wait_for(communicate.save(str(out_wav)), timeout=90)
             if not out_wav.exists() or out_wav.stat().st_size < 1024:
                 raise RuntimeError("Edge-TTS returned an empty or incomplete audio file.")
@@ -277,6 +279,56 @@ def concat_wavs(paths, dst, d):
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(dst)])
 
 
+# --- speech preparation: numbers and Latin terms are converted for the voice only ---------------
+SPEECH_LEXICON = {      # Latin / symbol -> how Farid should say it (extend freely)
+    "AI": "ای آی", "ChatGPT": "چت جی پی تی", "GPT": "جی پی تی", "Instagram": "اینستاگرام",
+    "YouTube": "یوتیوب", "Telegram": "تلگرام", "WhatsApp": "واتس اپ", "Google": "گوگل",
+    "SEO": "اس ای او", "CEO": "سی ای او", "KPI": "کی پی آی", "OK": "اوکی", "ok": "اوکی",
+    "online": "آنلاین", "Online": "آنلاین", "offline": "آفلاین", "Mr.Continuity": "آقای استمرار",
+    "BTC": "بیت کوین", "ETH": "اتریوم", "USDT": "تتر", "NFT": "ان اف تی", "VIP": "وی آی پی",
+}
+_ONES = ["صفر", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه", "ده", "یازده", "دوازده",
+         "سیزده", "چهارده", "پانزده", "شانزده", "هفده", "هجده", "نوزده"]
+_TENS = ["", "", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود"]
+_HUND = ["", "صد", "دویست", "سیصد", "چهارصد", "پانصد", "ششصد", "هفتصد", "هشتصد", "نهصد"]
+_SCALE = [(10 ** 12, "تریلیون"), (10 ** 9, "میلیارد"), (10 ** 6, "میلیون"), (10 ** 3, "هزار")]
+
+
+def num_to_words_fa(n):
+    """Integer -> Persian words ('۹۰' -> 'نود', '۱۴۰۳' -> 'هزار و چهارصد و سه')."""
+    if n == 0:
+        return _ONES[0]
+    parts = []
+    for size, name in _SCALE:
+        if n >= size:
+            q, n = divmod(n, size)
+            parts.append(("" if (q == 1 and size == 1000) else num_to_words_fa(q) + " ") + name)
+    if n:
+        h, r = divmod(n, 100)
+        if h:
+            parts.append(_HUND[h])
+        if r:
+            parts.append(_ONES[r] if r < 20 else _TENS[r // 10] + (" و " + _ONES[r % 10] if r % 10 else ""))
+    return " و ".join(parts)
+
+
+def speakable(text):
+    """What the voice should read: digits/percent -> words, Latin terms -> Persian."""
+    t = (text or "").translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+    for key in sorted(SPEECH_LEXICON, key=len, reverse=True):
+        t = re.sub(rf"(?<![A-Za-z]){re.escape(key)}(?![A-Za-z])", SPEECH_LEXICON[key], t)
+    t = re.sub(r"(?<=\d),(?=\d{3}(?!\d))", "", t)
+
+    def num(m):
+        whole, frac = m.group(1), m.group(2)
+        out = num_to_words_fa(int(whole)) if len(whole) < 15 else whole
+        if frac:
+            out += " ممیز " + " ".join(_ONES[int(c)] for c in frac)
+        return out
+    t = re.sub(r"(\d+)(?:[.٫](\d+))?", num, t)
+    return re.sub(r"\s*[%٪]", " درصد", t)
+
+
 def tts_safe_text(text):
     """Remove pictographs/emoji and ZWNJ before TTS (Edge-TTS may reject emoji)."""
     kept = [c for c in (text or "") if unicodedata.category(c)[0] in {"L", "N", "M", "P", "Z"}]
@@ -294,7 +346,8 @@ def chunk_pause(chunk, last, final_pause):
     return PAUSE_CONT
 
 
-async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAUSE, lead=0.0):
+async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAUSE, lead=0.0,
+                            rate=None, pitch=None):
     wavs, timing, t = [], [], 0.0
     if lead > 0:
         lead_wav = d / f"a{idx:02d}_lead.wav"
@@ -305,9 +358,9 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
         raw_audio = d / f"a{idx:02d}_{j:02d}_raw.wav"
         wav = d / f"a{idx:02d}_{j:02d}.wav"
         pause = chunk_pause(ch, j == len(chunks) - 1, final_pause)
-        spoken = tts_safe_text(ch)
+        spoken = tts_safe_text(speakable(ch))
         if spoken:
-            await tts(spoken, raw_audio)
+            await tts(spoken, raw_audio, rate=rate, pitch=pitch)
             to_wav(raw_audio, wav, pause)
         else:
             silence_wav(wav, pause + 0.6)   # emoji-only chunk: shown, not spoken
@@ -615,8 +668,8 @@ KEYWORDS = {
  "piggy": [
   "کنار می گذارد",
   "کنار بگذار",
-  "صرفه جویی",
   "ذخیره پول",
+  "صرفه جویی",
   "پس انداز",
   "پسانداز",
   "کنار",
@@ -624,8 +677,8 @@ KEYWORDS = {
   "اندوخته"
  ],
  "banknote": [
-  "برگ پول",
   "پول نقد",
+  "برگ پول",
   "ورق پول",
   "اسکناس",
   "نقدی",
@@ -861,8 +914,8 @@ KEYWORDS = {
  ],
  "sleep_symbol": [
   "خواب آلودگی",
-  "نماد خواب",
   "خواب آلود",
+  "نماد خواب",
   "zzz"
  ],
  "target": [
@@ -897,8 +950,8 @@ KEYWORDS = {
   "پشتکار"
  ],
  "stairs": [
-  "قدم به قدم",
   "گام به گام",
+  "قدم به قدم",
   "به تدریج",
   "گام",
   "قدم",
@@ -1523,16 +1576,16 @@ KEYWORDS = {
  ],
  "fingerprint": [
   "منحصر به فرد",
-  "اثر انگشت",
   "برند شخصی",
+  "اثر انگشت",
   "هویت",
   "اصالت",
   "امضا",
   "شخصیت"
  ],
  "blockchain": [
-  "قرارداد هوشمند",
   "smart contract",
+  "قرارداد هوشمند",
   "بلاکچین",
   "بلاک",
   "چین",
@@ -2047,8 +2100,8 @@ KEYWORDS = {
  "user_plus": [
   "دنبال کن",
   "همراه شو",
-  "فالو کن",
   "ثبت نام",
+  "فالو کن",
   "عضو شو",
   "فالو",
   "پیوستن",
@@ -2834,7 +2887,8 @@ async def build(hook, scenes, d, dst, tag=None):
 
     # ---- audio: hook first (frame 0), scenes, spoken CTA
     if HOOK_SPEAK and tts_safe_text(hook):
-        audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN, final_pause=COVER_PAUSE, lead=OPENING_LEAD)]
+        audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN, final_pause=COVER_PAUSE,
+                                         lead=OPENING_LEAD, rate=HOOK_RATE, pitch=HOOK_PITCH)]
     else:
         sil = d / "cover_sil.wav"
         silence_wav(sil, COVER_MIN)
@@ -2853,7 +2907,9 @@ async def build(hook, scenes, d, dst, tag=None):
     total = sum(durs)
 
     # ---- icons: meaning first, never repeated in a video, rotated across videos
-    hist_path = dst.parent / ".icon_history.json"
+    hist_dir = Path(os.environ.get("REEL_HISTORY_DIR") or dst.parent)   # share across videos
+    hist_dir.mkdir(parents=True, exist_ok=True)
+    hist_path = hist_dir / ".icon_history.json"
     runs = _load_history(hist_path)
     recent = {}
     for r in runs:
@@ -2868,9 +2924,11 @@ async def build(hook, scenes, d, dst, tag=None):
     teaser = TEASERS[int(hashlib.md5(hook.encode()).hexdigest(), 16) % len(TEASERS)] if TEASERS else ""
     cover_png, cover_bg = d / "cover.png", d / "cover_bg.png"
     cover_layers = {name: d / f"cover_{name}.png" for name in ("chip", "icon", "hl")}
-    history_dir = dst.parent / ".cover_history"
-    history_dir.mkdir(parents=True, exist_ok=True)
-    known = {hashlib.sha256(p.read_bytes()).hexdigest() for p in history_dir.glob("*.png")}
+    hash_path = hist_dir / ".cover_hashes.json"      # only hashes are stored (tiny)
+    try:
+        known = set(json.loads(hash_path.read_text(encoding="utf-8")))
+    except Exception:
+        known = set()
     start_variant = random.SystemRandom().randrange(0, 12)
     cover_boxes = {}
     for attempt in range(12):
@@ -2882,7 +2940,11 @@ async def build(hook, scenes, d, dst, tag=None):
             break
     else:
         print("[warn] could not make a pixel-unique cover; using the last variant.")
-    (history_dir / f"{hashlib.sha256(cover_png.read_bytes()).hexdigest()[:16]}.png").write_bytes(cover_png.read_bytes())
+    known.add(hashlib.sha256(cover_png.read_bytes()).hexdigest())
+    try:
+        hash_path.write_text(json.dumps(sorted(known)[-200:]), encoding="utf-8")
+    except OSError:
+        pass
 
     # ---- page jobs: 4 background variants, drifting bokeh, brand, outro, slides
     bg_pngs = [d / f"bg{v}.png" for v in range(4)]
