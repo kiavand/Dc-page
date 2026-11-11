@@ -79,8 +79,8 @@ HOOK_SPEAK = True                # speak the full hook on the cover
 HOOK_RATE, HOOK_PITCH = "+4%", "+2Hz"   # slightly more energetic delivery for the hook only
 SFX = True                       # whoosh / pop / impact / ding
 BED = True                       # ambient bed (or mp3/wav from ./music) ducked under voice
-BED_VOLUME = 0.55
-SFX_VOLUME = 0.55
+BED_VOLUME = 0.35
+SFX_VOLUME = 0.35
 CRF_FINAL, PRESET_FINAL = 18, "medium"
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
