@@ -1,4 +1,4 @@
-"""Persian Reel builder v5.0 (standard layout, safe zones, unique icons).
+"""Persian Reel builder v6.0 (viral hook, cinematic look, sound design, unique icons).
 
 Input file (input.txt):
   line starting with "#"        -> cover topic/hook   (optional:  # hook | tag)
@@ -8,23 +8,30 @@ Each sentence is spoken and shown on screen one at a time.
 Usage:  python make_reel.py input.txt out/reel.mp4
 Output: reel.mp4 and cover.png in the same folder.
 
-What is standard in v5.0
-  * Persian typography fixed automatically (نیم‌فاصله, trailing punctuation, ؟ ، digits)
+What is standard in v6.0
+  * HOOK: the full hook is spoken from frame 0 (no dead air), shown as a big poster
+    headline with a gold keyword + a "watch till the end" teaser chip, and a punch-in zoom
+  * Cinematic background: your artwork + 4 rotating variants, glow, bokeh, vignette,
+    alternating zoom/pan, varied scene transitions
+  * Persian typography fixed automatically (نیم‌فاصله, ی, trailing punctuation, ؟ ، digits)
   * Layout keeps text inside Instagram/Reels safe zones (SAFE_TOP / SAFE_BOTTOM / SAFE_SIDE)
-  * Big balanced subtitles (text-wrap:balance, no orphan last line)
+  * Slide variety: card / punch (short lines) / big-number (title like "۹۰٪") layouts
   * 160 detailed icons, chosen by meaning, NEVER repeated inside one video and
     rotated across videos (.icon_history.json next to the output)
-  * Punctuation-aware pauses, silence trimmed from TTS, RTL progress bar,
-    slide-in motion, CTA end card, 48 kHz audio, dithered dark gradients
+  * Sound design: whoosh/pop/impact/ding made in code, ambient bed that ducks under the
+    voice (or your own mp3 from ./music), gentle voice EQ, 48 kHz audio
+  * Punctuation-aware pauses, TTS silence trimmed, spoken CTA end card, RTL progress bar
   * Optional offline font: put Estedad *.ttf/*.woff2 files in a `fonts/` folder
     next to this script (otherwise Google Fonts is used, needs internet).
 The background image is embedded at the very bottom of this file.
 """
+import array
 import asyncio
 import base64
 import hashlib
 import html
 import json
+import math
 import random
 import re
 import shutil
@@ -32,6 +39,7 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+import wave
 from pathlib import Path
 
 import edge_tts
@@ -47,30 +55,38 @@ SAFE_TOP = 270
 SAFE_BOTTOM = 670
 SAFE_SIDE = 80
 MAX_CHARS = 58                   # max characters per on-screen sentence chunk
-OPENING_LEAD = 0.25              # silence before the first spoken word
-COVER_PAUSE = 0.55               # pause after the cover word
-COVER_MIN = 2.4                  # cover stays long enough to read the word
+OPENING_LEAD = 0.0               # hook starts speaking on frame 0
+COVER_PAUSE = 0.30               # pause after the spoken hook
+COVER_MIN = 1.8                  # hook screen is at least this long
 PAUSE_SENT = 0.40                # pause after . ! ? …
 PAUSE_CLAUSE = 0.18              # pause after ، ؛ :
 PAUSE_CONT = 0.10                # pause when a sentence continues
 SCENE_PAUSE = 0.50               # pause at the end of each scene
 END_PAUSE = 0.45                 # pause after the very last sentence
-OUTRO = 2.8                      # end card length (s)
-XFADE = 0.4                      # crossfade between scenes (s)
-ZOOM_END = 1.05                  # slow background push-in
+OUTRO_MIN = 3.0                  # end card length (s), grows with the spoken CTA
+XFADE = 0.35                     # transition between scenes (s)
+TRANSITIONS = ("fade", "smoothleft", "fade", "smoothright")
+ZOOM_END = 0.06                  # background zoom amount per scene (alternates in/out)
 RISE_T = 0.38                    # slide-in time of icon/card (s)
 MUSIC_VOLUME = 0.12
 VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid) - unchanged
 RATE = "+0%"                     # speaking rate, e.g. "+5%"
 MAX_REEL_SECONDS = 60            # warn when the reel is longer
-SHOW_PROGRESS = True             # RTL progress bar above the safe area
-CRF_FINAL, PRESET_FINAL = 17, "medium"
+SHOW_PROGRESS = True             # thin RTL progress bar above the content
+HOOK_SPEAK = True                # speak the full hook on the cover
+SFX = True                       # whoosh / pop / impact / ding
+BED = True                       # ambient bed (or mp3/wav from ./music) ducked under voice
+BED_VOLUME = 0.55
+SFX_VOLUME = 0.55
+CRF_FINAL, PRESET_FINAL = 18, "medium"
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
 YELLOW = "#F2A900"
 LIGHT_GOLD = "#FFD98A"
 SLOGAN = "با آقای استمرار، انگیزه بساز"
-CTA_ITEMS = (("user_plus", "فالو کن"), ("bookmark", "ذخیره کن"))   # () disables
+CTA_ITEMS = (("user_plus", "فالو کن"), ("bookmark", "ذخیره کن"), ("send", "برای دوستت بفرست"))  # () disables
+CTA_SPEECH = "اگه به دردت خورد، ذخیره کن و برای دوستت بفرست."      # spoken on the end card ("" = silent)
+TEASERS = ("تا آخر ببین", "نکته‌ی آخرش مهم‌ترینه", "قبل از اسکرول، این رو ببین")  # cover chip, () disables
 
 FONT_LINK = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
              '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
@@ -103,6 +119,7 @@ def fix_persian(s):
                rf"{ZW}\1", s)                                                   # هزینه‌هایش
     s = re.sub(rf"(?<=ه) (ام|ات|اش|ایم|اید|اند)(?![{PER}])", rf"{ZW}\1", s)     # داشته‌اند
     s = re.sub(rf"(?<=[{PER}]) (تر|ترین)(?![{PER}])", rf"{ZW}\1", s)           # بزرگ‌تر
+    s = re.sub(rf"(?<=[{PER}]) ی(?![{PER}])", f"{ZW}ی", s)                      # همه‌ی ما
     s = re.sub(rf"(?<=[{PER}])\?", "؟", s)
     s = re.sub(rf"(?<=[{PER}]),", "،", s)
     s = re.sub(rf"(?<=[{PER}]);", "؛", s)
@@ -302,6 +319,85 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
     scene_wav = d / f"scene{idx:02d}.wav"
     concat_wavs(wavs, scene_wav, d)
     return scene_wav, timing, duration(scene_wav)
+
+
+# ------------------------------------------------------------------ sound design (no assets needed)
+SR = 44100
+
+
+def _whoosh(rnd, dur=0.6, vol=0.9):
+    n = int(dur * SR)
+    out, lp, slow = [0.0] * n, 0.0, 0.0
+    ks = 1 - math.exp(-2 * math.pi * 180 / SR)
+    for i in range(n):
+        x = i / n
+        a = 1 - math.exp(-2 * math.pi * (300 + 3800 * x) / SR)
+        lp += a * (rnd.uniform(-1, 1) - lp)
+        slow += ks * (lp - slow)
+        out[i] = (lp - slow) * (math.sin(math.pi * x) ** 2) * vol * 3.2
+    return out
+
+
+def _pop(rnd, vol=0.55):
+    n = int(0.11 * SR)
+    return [(math.sin(2 * math.pi * 1500 * (i / SR)) * math.exp(-(i / SR) * 70)
+             + rnd.uniform(-1, 1) * math.exp(-(i / SR) * 400) * 0.35) * vol for i in range(n)]
+
+
+def _impact(rnd, vol=0.9):
+    n = int(1.1 * SR)
+    out, lp = [0.0] * n, 0.0
+    for i in range(n):
+        t = i / SR
+        lp += 0.05 * (rnd.uniform(-1, 1) - lp)
+        out[i] = (math.sin(2 * math.pi * 52 * t) * math.exp(-t * 4.5) * 0.9
+                  + math.sin(2 * math.pi * 118 * t) * math.exp(-t * 9) * 0.35
+                  + lp * math.exp(-t * 14) * 1.4) * vol
+    return out
+
+
+def _ding(vol=0.5):
+    n = int(1.4 * SR)
+    return [(math.sin(2 * math.pi * 1318.5 * (i / SR)) + 0.5 * math.sin(2 * math.pi * 1975.5 * (i / SR))
+             + 0.25 * math.sin(2 * math.pi * 2637 * (i / SR))) * math.exp(-(i / SR) * 4.2) * vol * 0.45
+            for i in range(n)]
+
+
+def make_sfx(events, total, path):
+    """events: [(time_s, 'impact'|'whoosh'|'pop'|'ding')] -> stereo wav, same length as the reel."""
+    rnd = random.Random(7)
+    buf = [0.0] * int((total + 1.5) * SR)
+    for t, kind in events:
+        snd = {"impact": lambda: _impact(rnd), "whoosh": lambda: _whoosh(rnd),
+               "pop": lambda: _pop(rnd), "ding": _ding}[kind]()
+        start = max(int(t * SR), 0)
+        for i, v in enumerate(snd):
+            if start + i >= len(buf):
+                break
+            buf[start + i] += v
+    pcm = array.array("h")
+    for v in buf:
+        v = max(-1.0, min(1.0, v))
+        pcm.append(int(v * 32000))
+        pcm.append(int(v * 32000))
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(pcm.tobytes())
+
+
+def make_bed(total, path):
+    """Warm A-major drone pad (soft sines + slow tremolo) used when ./music has no tracks."""
+    d = total + 1.0
+    freqs = (110.0, 164.81, 220.5, 277.18, 329.63, 441.0)
+    cmd = ["ffmpeg", "-y"]
+    for f in freqs:
+        cmd += ["-f", "lavfi", "-i", f"sine=f={f}:d={d:.2f}:r={SR}"]
+    ins = "".join(f"[{i}:a]" for i in range(len(freqs)))
+    fc = (f"{ins}amix=inputs={len(freqs)}:normalize=0,tremolo=f=0.17:d=0.4,lowpass=f=1100,"
+          f"volume=0.07,afade=t=in:d=2,afade=t=out:st={max(d - 2.5, 0):.2f}:d=2.5[o]")
+    run(cmd + ["-filter_complex", fc, "-map", "[o]", "-ac", "2", str(path)])
 
 
 # ------------------------------------------------------------------ icons
@@ -525,8 +621,8 @@ KEYWORDS = {
  ],
  "banknote": [
   "برگ پول",
-  "ورق پول",
   "پول نقد",
+  "ورق پول",
   "اسکناس",
   "نقدی",
   "درآمد",
@@ -607,9 +703,7 @@ KEYWORDS = {
   "قیمت",
   "برچسب",
   "ارزان",
-  "گران",
-  "بها",
-  "ارزش"
+  "گران"
  ],
  "cart": [
   "مصرف گرایی",
@@ -700,7 +794,8 @@ KEYWORDS = {
   "چرخه",
   "مداوم",
   "دوباره",
-  "ادامه"
+  "ادامه",
+  "پشتکار"
  ],
  "calendar": [
   "برنامه ریزی",
@@ -722,9 +817,7 @@ KEYWORDS = {
   "چک",
   "تیک",
   "روزشمار",
-  "تکمیل",
-  "به",
-  "موقع"
+  "تکمیل"
  ],
  "sunrise": [
   "شروع روز",
@@ -764,8 +857,8 @@ KEYWORDS = {
  ],
  "sleep_symbol": [
   "خواب آلودگی",
-  "نماد خواب",
   "خواب آلود",
+  "نماد خواب",
   "zzz"
  ],
  "target": [
@@ -796,11 +889,12 @@ KEYWORDS = {
   "بلندپروازی",
   "مانع",
   "موانع",
-  "چالش"
+  "چالش",
+  "پشتکار"
  ],
  "stairs": [
-  "قدم به قدم",
   "گام به گام",
+  "قدم به قدم",
   "به تدریج",
   "گام",
   "قدم",
@@ -920,7 +1014,11 @@ KEYWORDS = {
   "دقت",
   "جزئیات",
   "تحقیق",
-  "نکته"
+  "نکته",
+  "انتقاد",
+  "نقد",
+  "بازخورد",
+  "ایراد"
  ],
  "fire": [
   "انگیزه",
@@ -1072,7 +1170,9 @@ KEYWORDS = {
   "پیمان",
   "اعتماد",
   "قول",
-  "وعده"
+  "وعده",
+  "پذیرش",
+  "پذیرفتن"
  ],
  "heart": [
   "عشق",
@@ -1089,7 +1189,10 @@ KEYWORDS = {
   "مهر",
   "ترس",
   "نگرانی",
-  "اضطراب"
+  "اضطراب",
+  "دلسوزی",
+  "همدردی",
+  "دلسوز"
  ],
  "smile": [
   "خنده",
@@ -1109,7 +1212,8 @@ KEYWORDS = {
   "نا",
   "امید",
   "ناامیدی",
-  "گریه"
+  "گریه",
+  "ناراحتی"
  ],
  "ear": [
   "شنیدن حرف",
@@ -1191,7 +1295,10 @@ KEYWORDS = {
   "جهت",
   "قطب",
   "راهنما",
-  "هدایت"
+  "هدایت",
+  "باور",
+  "اعتقاد",
+  "ایمان"
  ],
  "signpost": [
   "مسیر زندگی",
@@ -1254,8 +1361,7 @@ KEYWORDS = {
   "مشکل",
   "شاید",
   "آیا",
-  "ابهام",
-  "چالش"
+  "ابهام"
  ],
  "check": [
   "انجام شد",
@@ -1416,9 +1522,9 @@ KEYWORDS = {
   "اثر انگشت",
   "برند شخصی",
   "هویت",
-  "شخصیت",
   "اصالت",
-  "امضا"
+  "امضا",
+  "شخصیت"
  ],
  "blockchain": [
   "smart contract",
@@ -1596,7 +1702,10 @@ KEYWORDS = {
   "موافق",
   "خوب",
   "تشویق",
-  "حمایت"
+  "حمایت",
+  "تعریف",
+  "تحسین",
+  "ستایش"
  ],
  "video": [
   "ویدیو",
@@ -1740,15 +1849,16 @@ KEYWORDS = {
   "تغییر",
   "مسیر",
   "برگرد",
-  "پشیمانی"
+  "پشیمانی",
+  "دگرگونی"
  ],
  "stop_sign": [
   "علامت ایست",
   "ایست",
   "توقف",
-  "کافی",
   "متوقف",
-  "قطع"
+  "قطع",
+  "بس کن"
  ],
  "building": [
   "آسمان خراش",
@@ -1791,7 +1901,9 @@ KEYWORDS = {
   "داوری",
   "بالانس",
   "سنجش",
-  "ترازو"
+  "ترازو",
+  "انتقاد",
+  "نقد"
  ],
  "lightning": [
   "برق",
@@ -1820,7 +1932,10 @@ KEYWORDS = {
   "شیر",
   "جنگل",
   "نر",
-  "ماده"
+  "ماده",
+  "شجاعت",
+  "شجاع",
+  "جرات"
  ],
  "fox": [
   "روباه",
@@ -1860,7 +1975,6 @@ KEYWORDS = {
   "آرام آرام",
   "لاک پشت",
   "آهسته",
-  "کند",
   "صبوری"
  ],
  "flask": [
@@ -1929,8 +2043,8 @@ KEYWORDS = {
  "user_plus": [
   "همراه شو",
   "دنبال کن",
-  "فالو کن",
   "ثبت نام",
+  "فالو کن",
   "عضو شو",
   "فالو",
   "پیوستن",
@@ -2208,7 +2322,13 @@ RELATED = {
 
 
 SUFFIXES = {"ها", "های", "هایی", "ی", "یی", "ش", "ت", "م", "مان", "تان", "شان", "ان", "ات", "ین",
-            "ه", "هایش", "هایت", "هایم", "ای", "تر", "ترین", "را"}
+            "ه", "هایش", "هایت", "هایم", "هایمان", "هایتان", "هایشان", "ای", "تر", "ترین", "را",
+            "مان", "اش", "ام"}
+
+
+# neutral, positive icons for sentences that match no keyword
+FILLER = ("spark", "compass", "stairs", "key", "bulb", "flag", "target", "anchor", "sprout", "star",
+          "rocket", "medal", "shield", "mountain", "diamond", "crown", "lightning", "fire", "trophy", "infinity")
 
 
 def _tokens(text):
@@ -2271,9 +2391,10 @@ def assign_unique_icon_kinds(items, reserved=(), recent=None):
         ranked.sort(key=lambda kv: -kv[1])
         pick = next((k for k, _ in ranked if k not in used), None)
         if pick is None:                           # no meaning-based candidate left: stable filler
-            pool = [k for k in sorted(ICONS) if k not in used] or sorted(ICONS)
             if len(used) >= len(ICONS):
                 used.clear()
+            pool = ([k for k in FILLER if k in ICONS and k not in used]
+                    or [k for k in sorted(ICONS) if k not in used] or sorted(ICONS))
             pool.sort(key=lambda k: (recent.get(k, 0),
                                      hashlib.sha256((norm(text) + k).encode()).hexdigest()))
             pick = pool[0]
@@ -2290,27 +2411,6 @@ def icon_svg(kind, size=300):
             f"<defs><linearGradient id='{gid}' gradientUnits='userSpaceOnUse' x1='0' y1='0' x2='0' y2='120'>"
             f"<stop offset='0' stop-color='#FFE6A8'/><stop offset='1' stop-color='{YELLOW}'/></linearGradient></defs>"
             f"<g style='stroke:url(#{gid})'>{ICONS[kind]}</g></svg>")
-
-
-def cover_word(hook):
-    t = norm(hook).strip()
-    hook_phrases = [
-        (("منتظر نمون", "منتظر نمان", "منتظر شرایط", "شروع نکردن", "شروع کن"), "شروع کن"),
-        (("کمال گرایی", "کمالگرایی", "بی نقص"), "شروع ناقص"),
-        (("کنترل ذهن", "ذهن در شرایط سخت"), "کنترل ذهن"),
-        (("مثبت نگه داشتن", "مثبت باش"), "ذهن مثبت"),
-        (("اعتماد به نفس", "اعتمادبنفس"), "اعتمادبه‌نفس"),
-        (("مدیریت پول", "درآمد بیشتر"), "رشد مالی"),
-        (("عادت های درست", "ساختن عادت"), "عادت‌سازی"),
-        (("رهبری مستقل", "وابسته‌سازی"), "رهبری مستقل"),
-    ]
-    for phrases, label in hook_phrases:
-        if any(norm(phrase) in t for phrase in phrases):
-            return label
-    tokens = re.findall(r"[\u0600-\u06FF\w]+(?:‌[\u0600-\u06FF\w]+)?", strip_marks(hook))
-    ignored = {"از", "برای", "چطور", "چگونه", "چرا", "اگر", "این", "آن", "یک", "که", "با", "به", "در", "را", "و", "یا", "تا"}
-    chosen = [x for x in tokens if norm(x) not in ignored and len(norm(x)) > 1]
-    return " ".join(chosen[:2]) if len(chosen) >= 2 else (chosen[0] if chosen else "موضوع مهم")
 
 
 # ------------------------------------------------------------------ HTML layouts
@@ -2336,108 +2436,183 @@ def font_setup(d):
 
 STAGE_TOP = SAFE_TOP + 70
 STAGE_H = H - SAFE_BOTTOM - STAGE_TOP
-BG_URL = "url('bg_base.png') center / 100% 100% no-repeat"
+CONTENT_W = W - 2 * SAFE_SIDE
+KEYWORDS_HL = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "درآمد", "تلاش", "تیم",
+               "رهبری", "اعتماد", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت", "انعطاف",
+               "انتقاد", "پول", "ترس", "شکست", "آرامش", "اشتباه", "قدرت", "آزادی", "سرمایه", "فرصت"]
+_STOP_HL = {"این", "آن", "برای", "چون", "اما", "اگر", "باید", "باشد", "هست", "است", "شود", "یک", "از", "به",
+            "در", "با", "که", "را", "و", "همه", "هیچ", "بعد", "دیگر", "خیلی", "حتی", "هنوز"}
+
+
+def pick_keywords(text, n=1):
+    """1-2 words to colour gold: known power words first, else the longest content words."""
+    nt = norm(text)
+    found = [w for w in KEYWORDS_HL if norm(w) in nt]
+    if len(found) < n:
+        cands = [w for w in re.findall(r"[\u0600-\u06FF]{4,}", text) if norm(w) not in _STOP_HL and w not in found]
+        cands.sort(key=lambda w: -len(norm(w)))
+        found += cands
+    return found[:n]
+
+
+def highlight_html(text, words):
+    safe = html.escape(text)
+    for w in words:      # colour the whole word (never a fragment, so Persian letters keep joining)
+        safe = re.sub(rf"(?<![\u0600-\u06FF\u200c])[\u0600-\u06FF\u200c]*{re.escape(w)}[\u0600-\u06FF\u200c]*",
+                      lambda m: f"<span class='kw'>{m.group(0)}</span>", safe, count=1)
+    return safe
+
+
+def bg_layers(variant):
+    rnd = random.Random(variant * 131 + 7)
+    dots = ""
+    for _ in range(16):
+        sz = rnd.randint(14, 64)
+        dots += (f"<i style='left:{rnd.randint(30, 1010)}px;top:{rnd.randint(100, 1800)}px;"
+                 f"width:{sz}px;height:{sz}px;opacity:{rnd.uniform(.25, .75):.2f}'></i>")
+    return (f"<div class='base'></div><div class='art a{variant % 4}'></div><div class='glow'></div>"
+            f"<div class='bokeh'>{dots}</div><div class='vig'></div>")
 
 
 def base_css(font_css, transparent):
-    bg = "transparent" if transparent else f"{BG_URL},#08090B"
+    bg = "transparent" if transparent else "#07070a"
     return (f"{font_css}"
             f"html,body{{margin:0;width:{W}px;height:{H}px;overflow:hidden;background:{bg}}}"
             f"body{{font-family:{FONT};{FONT_RENDERING}color:#f3f4f6;position:relative}}"
+            f".base{{position:absolute;inset:0;background:radial-gradient(1300px 1000px at 50% 42%,#17171e 0%,#0b0b0f 62%,#050507 100%)}}"
+            f".art{{position:absolute;inset:0;background:url('bg_base.png') center / 100% 100% no-repeat;"
+            f"filter:brightness(.88) saturate(.96)}}"
+            f".art.a1{{transform:scaleX(-1)}}.art.a2{{transform:scaleY(-1)}}.art.a3{{transform:rotate(180deg)}}"
+            f".glow{{position:absolute;left:50%;top:{STAGE_TOP + STAGE_H // 2}px;width:1200px;height:1200px;margin:-600px 0 0 -600px;"
+            f"background:radial-gradient(circle,rgba(242,169,0,.14),rgba(242,169,0,0) 62%)}}"
+            f".bokeh i{{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,214,120,.55),rgba(255,214,120,0) 70%);"
+            f"filter:blur(1.5px)}}"
+            f".vig{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,0) 50%,rgba(0,0,0,.62) 100%)}}"
             f".ico{{fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;overflow:visible}}"
             f".ico .f{{fill:rgba(242,169,0,.16)}}"
             f".ico .d{{stroke:{LIGHT_GOLD};stroke-width:3.2;opacity:.92}}"
             f".ico .s{{fill:{YELLOW};stroke:none}}"
             f".stage{{position:absolute;left:0;right:0;top:{STAGE_TOP}px;height:{STAGE_H}px;display:flex;"
             f"flex-direction:column;align-items:center;justify-content:center;gap:52px}}"
-            f".brand{{position:absolute;left:0;right:0;top:{SAFE_TOP + 4}px;text-align:center;color:{YELLOW};"
-            f"font-size:34px;font-weight:700;opacity:.95;text-shadow:0 0 16px rgba(242,169,0,.25)}}"
+            f".brand{{position:absolute;left:50%;transform:translateX(-50%);top:{SAFE_TOP + 2}px;display:flex;align-items:center;"
+            f"gap:14px;padding:9px 30px;border-radius:40px;background:rgba(0,0,0,.45);border:1.5px solid rgba(242,169,0,.40);"
+            f"color:{LIGHT_GOLD};font-size:31px;font-weight:700;white-space:nowrap;direction:rtl}}"
+            f".brand b{{width:12px;height:12px;border-radius:50%;background:{YELLOW};box-shadow:0 0 14px {YELLOW}}}"
             f".halo{{width:400px;height:400px;display:flex;align-items:center;justify-content:center;position:relative}}"
-            f".halo:before{{content:'';position:absolute;inset:14px;border:2px solid rgba(242,169,0,.30);"
-            f"box-shadow:0 0 70px rgba(242,169,0,.20),inset 0 0 50px rgba(242,169,0,.10);"
-            f"background:radial-gradient(circle,rgba(242,169,0,.10),rgba(0,0,0,0) 68%)}}"
+            f".halo:before{{content:'';position:absolute;inset:14px;border:2px solid rgba(242,169,0,.32);"
+            f"box-shadow:0 0 70px rgba(242,169,0,.22),inset 0 0 50px rgba(242,169,0,.10);"
+            f"background:radial-gradient(circle,rgba(242,169,0,.12),rgba(0,0,0,0) 68%)}}"
             f".halo.h0:before{{border-radius:50%}}"
             f".halo.h1:before{{border-radius:34%}}"
-            f".halo.h2:before{{border-radius:50%;inset:6px;box-shadow:0 0 0 14px rgba(242,169,0,.07),0 0 70px rgba(242,169,0,.20)}}"
+            f".halo.h2:before{{border-radius:50%;inset:6px;box-shadow:0 0 0 14px rgba(242,169,0,.07),0 0 70px rgba(242,169,0,.22)}}"
             f".halo.h3:before{{border-radius:50%;border-style:dashed;border-width:3px}}"
-            f".halo .ico{{position:relative;filter:drop-shadow(0 12px 22px rgba(0,0,0,.55)) drop-shadow(0 0 22px rgba(242,169,0,.25))}}")
+            f".halo .ico{{position:relative;filter:drop-shadow(0 12px 22px rgba(0,0,0,.55)) drop-shadow(0 0 22px rgba(242,169,0,.28))}}"
+            f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 18px rgba(242,169,0,.35)}}")
 
 
-def page(body, css, head=""):
+FIT_JS = """
+document.fonts.ready.then(() => {
+  const st = document.querySelector('.stage'); if (!st) return;
+  const halo = document.querySelector('.halo'), svg = halo && halo.querySelector('svg');
+  const txt = document.querySelector('.hl') || document.querySelector('.card');
+  let hs = svg ? parseFloat(svg.getAttribute('width')) : 0, fs = txt ? parseFloat(getComputedStyle(txt).fontSize) : 0;
+  const over = () => { const k = st.children; if (!k.length) return false;
+    const a = k[0].getBoundingClientRect().top, b = k[k.length - 1].getBoundingClientRect().bottom;
+    return (b - a) > st.clientHeight - 24; };
+  for (let i = 0; i < 60 && over(); i++) {
+    if (svg && hs > 190) { hs -= 14; svg.setAttribute('width', hs); svg.setAttribute('height', hs);
+      halo.style.width = halo.style.height = (hs + 120) + 'px'; }
+    else if (txt && fs > 46) { fs -= 3; txt.style.fontSize = fs + 'px'; } else break;
+  }
+});
+"""
+
+
+def page(body, css, head="", bg=None):
+    layers = bg_layers(bg) if bg is not None else ""
     return (f"<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'>{head}"
-            f"<style>{css}</style></head><body>{body}</body></html>")
+            f"<style>{css}</style></head><body>{layers}{body}<script>{FIT_JS}</script></body></html>")
 
 
-def bg_html(font_head, font_css):
-    return page("", base_css(font_css, False), font_head)
+def brand_div():
+    return f"<div class='brand'><b></b>{html.escape(BRAND_NAME)}</div>"
+
+
+def bg_html(variant, font_head, font_css):
+    return page("", base_css(font_css, False), font_head, bg=variant)
 
 
 def brand_html(font_head, font_css):
-    return page(f"<div class='brand'>{html.escape(BRAND_NAME)}</div>", base_css(font_css, True), font_head)
+    return page(brand_div(), base_css(font_css, True), font_head)
 
 
-def sub_html(text, kind, variant, font_head, font_css):
-    """One slide: icon layer + subtitle card layer (rendered separately for motion)."""
+def sub_html(text, kind, variant, font_head, font_css, stat=None):
+    """One slide: icon (or big number) layer + subtitle layer, rendered separately for motion.
+    Layout modes: card (default), punch (very short line, no box), stat (big number)."""
     text = clean_display(text)
     n = len(text)
-    size = 92 if n < 22 else 82 if n < 34 else 74 if n < 46 else 66 if n < 54 else 60
-    keyword_groups = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن", "رشد", "پشتکار", "درآمد", "تلاش", "تیم",
-                      "رهبری", "اعتماد", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت", "انعطاف"]
-    normalized = norm(text)
-    highlighted = next((w for w in keyword_groups if norm(w) in normalized), None)
-    if not highlighted:
-        stop = {"این", "آن", "برای", "چون", "اما", "اگر", "باید", "باشد", "هست", "است", "شود", "یک", "از", "به", "در", "با", "که", "را", "و"}
-        cands = [w for w in re.findall(r"[\u0600-\u06FF]{3,}", text) if norm(w) not in stop]
-        if cands:
-            highlighted = max(cands, key=lambda w: len(norm(w)))
-    safe = html.escape(text)
-    if highlighted:
-        safe = re.compile(re.escape(highlighted)).sub(lambda m: f"<span class='kw'>{m.group(0)}</span>", safe, count=1)
+    punch = n <= 24 and not stat
+    size = (118 if n < 14 else 104) if punch else 92 if n < 22 else 82 if n < 34 else 74 if n < 46 else 66 if n < 54 else 60
+    safe = highlight_html(text, pick_keywords(text, 1))
     css = (base_css(font_css, True) +
-           f".card{{width:{W - 2 * SAFE_SIDE}px;box-sizing:border-box;background:rgba(14,14,20,.96);"
+           f".card{{position:relative;width:{CONTENT_W}px;box-sizing:border-box;"
+           f"background:linear-gradient(180deg,rgba(26,26,34,.95),rgba(12,12,18,.97));"
            f"font-weight:700;font-size:{size}px;line-height:1.62;padding:38px 52px;border-radius:38px;"
            f"text-align:center;direction:rtl;text-wrap:balance;overflow-wrap:break-word;"
-           f"border:2px solid rgba(242,169,0,.26);"
-           f"box-shadow:0 28px 60px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.10)}}"
-           f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 14px rgba(242,169,0,.30)}}")
-    body = (f"<div class='stage'><div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 270)}</div>"
-            f"<div class='card' data-layer='card'>{safe}</div></div>")
+           f"border:2px solid rgba(242,169,0,.24);"
+           f"box-shadow:0 28px 60px rgba(0,0,0,.72),inset 0 1px 0 rgba(255,255,255,.12)}}"
+           f".card:before{{content:'';position:absolute;top:-3px;left:50%;width:120px;height:6px;margin-left:-60px;"
+           f"border-radius:6px;background:linear-gradient(90deg,rgba(242,169,0,0),{YELLOW},rgba(242,169,0,0))}}"
+           f".card.punch{{background:none;border:none;box-shadow:none;padding:10px 20px;font-weight:800;"
+           f"text-shadow:0 6px 30px rgba(0,0,0,.85),0 0 40px rgba(242,169,0,.12)}}"
+           f".card.punch:before{{display:none}}"
+           f".stat{{font-size:230px;font-weight:800;line-height:1.1;color:{YELLOW};text-align:center;direction:rtl;"
+           f"height:400px;display:flex;align-items:center;justify-content:center;"
+           f"text-shadow:0 0 70px rgba(242,169,0,.40),0 10px 30px rgba(0,0,0,.6)}}")
+    top = (f"<div class='stat' data-layer='icon'>{html.escape(stat)}</div>" if stat else
+           f"<div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 270 if not punch else 230)}</div>")
+    body = (f"<div class='stage'>{top}"
+            f"<div class='card{' punch' if punch else ''}' data-layer='card'>{safe}</div></div>")
     return page(body, css, font_head)
 
 
-def cover_html(hook, kind, variant, font_head, font_css):
-    word = cover_word(hook)
+def cover_html(hook, kind, variant, teaser, font_head, font_css):
+    """Poster-style hook screen (also the thumbnail): chip + icon + huge headline."""
     sub = clean_display(hook)
-    show_sub = norm(sub) != norm(word) and len(sub) <= 90
+    n = len(sub)
+    size = 150 if n <= 16 else 132 if n <= 28 else 112 if n <= 44 else 96 if n <= 64 else 82
     css = (base_css(font_css, False) +
-           f".stage{{gap:30px;text-align:center}}"
-           f".word{{color:{YELLOW};font-weight:800;font-size:{124 + (variant % 3) * 6}px;line-height:1.35;"
-           f"max-width:{W - 2 * SAFE_SIDE}px;text-wrap:balance;text-shadow:0 8px 34px rgba(242,169,0,.25)}}"
-           f".rule{{width:{120 + (variant % 4) * 24}px;height:5px;border-radius:8px;"
+           f".stage{{gap:34px;text-align:center}}"
+           f".chip{{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#FFD35C,{YELLOW});"
+           f"color:#14110a;border-radius:44px;padding:12px 38px;font-size:42px;font-weight:800;"
+           f"box-shadow:0 10px 40px rgba(242,169,0,.35)}}"
+           f".chip .ico{{stroke:#14110a}}.chip .ico .f{{fill:rgba(20,17,10,.12)}}.chip .ico .d{{stroke:#14110a}}.chip .ico .s{{fill:#14110a}}"
+           f".hl{{font-size:{size}px;font-weight:800;line-height:1.38;max-width:{CONTENT_W}px;text-wrap:balance;"
+           f"text-shadow:0 8px 40px rgba(0,0,0,.8)}}"
+           f".rule{{width:{140 + (variant % 4) * 26}px;height:6px;border-radius:8px;"
            f"background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
-           f".sub{{font-size:52px;font-weight:600;line-height:1.55;max-width:{W - 2 * SAFE_SIDE - 40}px;"
-           f"text-wrap:balance;color:#e8e8ee}}"
-           f".halo{{width:440px;height:440px}}")
-    body = (f"<div class='brand'>{html.escape(BRAND_NAME)}</div><div class='stage'>"
-            f"<div class='halo h{variant % 4}'>{icon_svg(kind, 300)}</div>"
-            f"<div class='word'>{html.escape(word)}</div><div class='rule'></div>"
-            + (f"<div class='sub'>{html.escape(sub)}</div>" if show_sub else "") + "</div>")
-    return page(body, css, font_head)
+           f".halo{{width:380px;height:380px}}")
+    chip = (f"<div class='chip'>{icon_svg('stopwatch', 52)}<span>{html.escape(teaser)}</span></div>" if teaser else "")
+    body = (f"{brand_div()}<div class='stage'>{chip}"
+            f"<div class='halo h{variant % 4}'>{icon_svg(kind, 260)}</div>"
+            f"<div class='hl'>{highlight_html(sub, pick_keywords(sub, 2))}</div><div class='rule'></div></div>")
+    return page(body, css, font_head, bg=0)
 
 
 def outro_html(font_head, font_css):
     css = (base_css(font_css, False) +
-           f".stage{{gap:34px;text-align:center}}"
-           f".slogan{{font-size:68px;font-weight:800;line-height:1.5;color:{YELLOW};white-space:nowrap;"
-           f"text-shadow:0 0 30px rgba(242,169,0,.3)}}"
-           f".cta{{display:flex;gap:26px;margin-top:18px}}"
-           f".pill{{display:flex;align-items:center;gap:16px;background:rgba(14,14,20,.96);color:#f3f4f6;"
-           f"border:2px solid rgba(242,169,0,.35);border-radius:60px;padding:16px 34px;font-size:44px;font-weight:700}}")
-    pills = "".join(f"<div class='pill'>{icon_svg(k, 58)}<span>{html.escape(t)}</span></div>" for k, t in CTA_ITEMS)
-    body = (f"<div class='brand'>{html.escape(BRAND_NAME)}</div><div class='stage'>"
-            f"<div class='slogan'>{html.escape(SLOGAN)}</div>"
+           f".stage{{gap:30px;text-align:center}}"
+           f".slogan{{font-size:76px;font-weight:800;line-height:1.5;color:{YELLOW};max-width:{CONTENT_W}px;"
+           f"text-wrap:balance;text-shadow:0 0 36px rgba(242,169,0,.32)}}"
+           f".rule{{width:160px;height:6px;border-radius:8px;background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
+           f".cta{{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:14px}}"
+           f".pill{{display:flex;align-items:center;gap:18px;background:linear-gradient(180deg,rgba(26,26,34,.96),rgba(12,12,18,.98));"
+           f"color:#f3f4f6;border:2px solid rgba(242,169,0,.45);border-radius:70px;padding:16px 44px;font-size:50px;"
+           f"font-weight:700;box-shadow:0 14px 40px rgba(0,0,0,.6)}}")
+    pills = "".join(f"<div class='pill'>{icon_svg(k, 64)}<span>{html.escape(t)}</span></div>" for k, t in CTA_ITEMS)
+    body = (f"{brand_div()}<div class='stage'><div class='slogan'>{html.escape(SLOGAN)}</div><div class='rule'></div>"
             + (f"<div class='cta'>{pills}</div>" if pills else "") + "</div>")
-    return page(body, css, font_head)
+    return page(body, css, font_head, bg=2)
 
 
 _LAYER_JS = ("(layer) => document.querySelectorAll('[data-layer]').forEach(e => "
@@ -2465,29 +2640,37 @@ async def render_pages(jobs, d):
 
 
 # ------------------------------------------------------------------ video assembly
-def scene_video(idx, bg_png, brand_png, subs, dur, is_last, out):
-    """bg (slow zoom) + static brand + per-sentence icon/card layers sliding in."""
+def scene_video(idx, bg_png, brand_png, subs, dur, is_last, out, cover=False):
+    """bg (zoom/pan, alternating) + static brand + per-sentence icon/card layers sliding in."""
     length = dur + (0 if is_last else XFADE)
     frames = int(length * FPS) + 2
-    inc = (ZOOM_END - 1) / frames
-    z = f"min(zoom+{inc:.6f},{ZOOM_END})"
+    f = f"on/{frames}"
+    if cover:                                    # punch-in on the hook, then slow push
+        z = f"1+0.04*{f}+0.10*pow(max(1-on/({0.7 * FPS:.1f}),0),2)"
+    elif idx % 2:                                # alternate push-in / pull-out
+        z = f"1+{ZOOM_END}*{f}"
+    else:
+        z = f"1+{ZOOM_END}*(1-{f})"
+    pan = 36 * (1 if idx % 2 else -1)
     cmd = ["ffmpeg", "-y", "-i", str(bg_png)]
-    layers = ([brand_png] if brand_png else []) + [p for s in subs for p in (s[0], s[1])]
-    for png in layers:
-        cmd += ["-loop", "1", "-t", f"{length:.3f}", "-i", str(png)]
-    fc = (f"[0:v]scale={W * 2}:{H * 2},zoompan=z='{z}':x='iw/2-(iw/zoom/2)':"
+    if brand_png:
+        cmd += ["-loop", "1", "-t", f"{length:.3f}", "-i", str(brand_png)]
+    for icon_png, card_png, a, b in subs:      # each layer only decodes during its own time window
+        for png in (icon_png, card_png):
+            cmd += ["-itsoffset", f"{a:.3f}", "-loop", "1", "-t", f"{b - a + 0.05:.3f}", "-i", str(png)]
+    fc = (f"[0:v]scale={int(W * 1.5)}:{int(H * 1.5)},zoompan=z='{z}':x='iw/2-(iw/zoom/2)+({pan})*({f}-0.5)':"
           f"y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS},format=yuv420p[v0]")
     last, k = "v0", 1
     if brand_png:
         fc += f";[{k}:v]format=rgba[br];[{last}][br]overlay=0:0[vb]"
         last, k = "vb", k + 1
     for icon_png, card_png, a, b in subs:
-        for kind, rise, delay, fade in (("icon", 44, 0.0, 0.16), ("card", 30, 0.07, 0.20)):
+        for rise, delay, fade in ((44, 0.0, 0.16), (30, 0.07, 0.20)):
             fd = min(fade, max(0.08, (b - a) / 4.0))
             s0 = a + delay
             fc += (f";[{k}:v]format=rgba,fade=t=in:st={s0:.3f}:d={fd:.3f}:alpha=1[l{k}]"
                    f";[{last}][l{k}]overlay=x=0:y='{rise}*pow(1-min(max((t-{s0:.3f})/{RISE_T},0),1),3)':"
-                   f"enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
+                   f"eof_action=pass:enable='between(t,{a:.3f},{b:.3f})'[v{k}]")
             last, k = f"v{k}", k + 1
     cmd += ["-filter_complex", fc, "-map", f"[{last}]", "-t", f"{length:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "14",
@@ -2505,38 +2688,58 @@ def pick_music(seed_text):
     return rnd.choice(files)
 
 
-def assemble(clips, durs, voice_wav, music, out):
+def assemble(clips, durs, voice_wav, sfx_wav, bed, bed_is_music, out):
     total = sum(durs)
     cmd = ["ffmpeg", "-y"]
     for c in clips:
         cmd += ["-i", str(c)]
-    cmd += ["-i", str(voice_wav)]
     vi = len(clips)
+    cmd += ["-i", str(voice_wav)]
     nxt = vi + 1
-    if music:
-        cmd += ["-stream_loop", "-1", "-i", str(music)]
-        mi, nxt = vi + 1, nxt + 1
-    bar_h, bar_y = 6, SAFE_TOP - 22
+    si = bi = None
+    if sfx_wav:
+        cmd += ["-i", str(sfx_wav)]
+        si, nxt = nxt, nxt + 1
+    if bed:
+        if bed_is_music:
+            cmd += ["-stream_loop", "-1"]
+        cmd += ["-i", str(bed)]
+        bi, nxt = nxt, nxt + 1
+    w2, bar_h, bar_y = W - 2 * SAFE_SIDE, 6, SAFE_TOP - 26
     if SHOW_PROGRESS:
-        cmd += ["-f", "lavfi", "-i", f"color=c=0x{YELLOW[1:]}:s={W}x{bar_h}:r={FPS}:d={total:.3f}"]
+        cmd += ["-f", "lavfi", "-i", f"color=c=white:s={w2}x{bar_h}:r={FPS}:d={total:.3f}",
+                "-f", "lavfi", "-i", f"color=c=white:s={w2}x{bar_h}:r={FPS}:d={total:.3f}"]
+    # video: scene transitions -> dither -> progress bar
     fc, last, start = "", "[0:v]", 0.0
     for i in range(1, len(clips)):
         start += durs[i - 1]
-        fc += f"{last}[{i}:v]xfade=transition=fade:duration={XFADE}:offset={start:.3f}[x{i}];"
+        tr = TRANSITIONS[(i - 1) % len(TRANSITIONS)]
+        fc += f"{last}[{i}:v]xfade=transition={tr}:duration={XFADE}:offset={start:.3f}[x{i}];"
         last = f"[x{i}]"
-    fc += f"{last}noise=alls=2:allf=t,format=yuv420p[vn];"
+    fc += f"{last}noise=alls=1:allf=t,format=yuv420p[vn];"
     if SHOW_PROGRESS:
-        fc += (f"[vn]drawbox=x=0:y={bar_y}:w=iw:h={bar_h}:color=white@0.14:t=fill[vt];"
-               f"[vt][{nxt}:v]overlay=x='{W}-{W}*t/{total:.3f}':y={bar_y}[vout];")
+        fc += (f"[{nxt}:v]format=rgba,colorchannelmixer=aa=0.22[trk];[{nxt + 1}:v]format=rgba[bar];"
+               f"[trk][bar]overlay=x='{w2}-{w2}*t/{total:.3f}':y=0:format=auto[prog];"
+               f"[vn][prog]overlay={SAFE_SIDE}:{bar_y}:format=auto[vout];")
     else:
         fc += "[vn]null[vout];"
-    if music:
-        fc += (f"[{mi}:a]volume={MUSIC_VOLUME},afade=t=in:d=1,"
-               f"afade=t=out:st={max(total - 1.5, 0):.3f}:d=1.5[m];"
-               f"[{vi}:a][m]amix=inputs=2:duration=first:normalize=0[mix];"
-               f"[mix]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
+    # audio: voice EQ/comp -> (ducked bed) + sfx -> loudness
+    voice_chain = ("highpass=f=70,equalizer=f=3200:t=q:w=1.2:g=2,"
+                   "acompressor=threshold=-18dB:ratio=3:attack=8:release=120:makeup=2")
+    parts, mix_in = [], ["[v1]"]
+    if bed:
+        fc += f"[{vi}:a]{voice_chain},asplit=2[v1][v2];"
+        vol = MUSIC_VOLUME if bed_is_music else BED_VOLUME
+        fc += (f"[{bi}:a]volume={vol},afade=t=in:d=1,afade=t=out:st={max(total - 1.5, 0):.3f}:d=1.5[b0];"
+               f"[b0][v2]sidechaincompress=threshold=0.015:ratio=12:attack=20:release=450[bd];")
+        mix_in.append("[bd]")
     else:
-        fc += f"[{vi}:a]loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]"
+        fc += f"[{vi}:a]{voice_chain}[v1];"
+    if sfx_wav:
+        fc += f"[{si}:a]volume={SFX_VOLUME}[sf];"
+        mix_in.append("[sf]")
+    fc += (f"{''.join(mix_in)}amix=inputs={len(mix_in)}:duration=first:normalize=0,"
+           f"loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000[aout]")
     cmd += ["-filter_complex", fc, "-map", "[vout]", "-map", "[aout]",
             "-t", f"{total:.3f}", "-c:v", "libx264", "-preset", PRESET_FINAL,
             "-crf", str(CRF_FINAL), "-profile:v", "high", "-pix_fmt", "yuv420p", "-r", str(FPS),
@@ -2553,6 +2756,9 @@ def _load_history(path):
     return runs[-4:]
 
 
+STAT_RE = re.compile(r"^[\d۰-۹][\d۰-۹٫.,/٪%+×xX]*")
+
+
 async def build(hook, scenes, d, dst, tag=None):
     shots = []
     for i, sc in enumerate(scenes, start=1):
@@ -2566,17 +2772,25 @@ async def build(hook, scenes, d, dst, tag=None):
     font_head, font_css = font_setup(d)
     (d / "bg_base.png").write_bytes(base64.b64decode(BACKGROUND_IMAGE_DATA.split(",", 1)[1]))
 
-    # ---- audio
-    word = cover_word(hook)
-    audio = [await build_scene_audio(0, [word], d, min_total=COVER_MIN, final_pause=COVER_PAUSE,
-                                     lead=OPENING_LEAD)]
+    # ---- audio: hook first (frame 0), scenes, spoken CTA
+    if HOOK_SPEAK and tts_safe_text(hook):
+        audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN, final_pause=COVER_PAUSE, lead=OPENING_LEAD)]
+    else:
+        sil = d / "cover_sil.wav"
+        silence_wav(sil, COVER_MIN)
+        audio = [(sil, [], COVER_MIN)]
     for k, sh in enumerate(shots, start=1):
         audio.append(await build_scene_audio(k, sh["chunks"], d,
                                              final_pause=END_PAUSE if k == len(shots) else SCENE_PAUSE))
-    outro_wav = d / "outro.wav"
-    silence_wav(outro_wav, OUTRO)
-    audio.append((outro_wav, [], duration(outro_wav)))
+    if CTA_SPEECH:
+        audio.append(await build_scene_audio(len(shots) + 1, [CTA_SPEECH], d, min_total=OUTRO_MIN, final_pause=0.5))
+    else:
+        outro_wav = d / "outro.wav"
+        silence_wav(outro_wav, OUTRO_MIN)
+        audio.append((outro_wav, [], OUTRO_MIN))
     n = len(audio)
+    durs = [a[2] for a in audio]
+    total = sum(durs)
 
     # ---- icons: meaning first, never repeated in a video, rotated across videos
     hist_path = dst.parent / ".icon_history.json"
@@ -2585,12 +2799,16 @@ async def build(hook, scenes, d, dst, tag=None):
     for r in runs:
         for kind in r:
             recent[kind] = recent.get(kind, 0) + 1
-    cover_kind = assign_unique_icon_kinds([(hook + " " + word, "")], recent=recent)[0]
+    cover_kind = assign_unique_icon_kinds([(hook, "")], recent=recent)[0]
     items = [(txt, " ".join([sh["title"], *sh["chunks"]])) for sh in shots for txt in sh["chunks"]]
     kinds = assign_unique_icon_kinds(items, reserved=(cover_kind,), recent=recent)
     kind_iter = iter(kinds)
 
-    # ---- cover (unique pixels vs. previous covers)
+    # ---- cover / hook poster (unique pixels vs. previous covers)
+    teaser = ""
+    if TEASERS:
+        secs = str(round(total)).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+        teaser = f"{secs} ثانیه · {TEASERS[int(hashlib.md5(hook.encode()).hexdigest(), 16) % len(TEASERS)]}"
     cover_png = d / "cover.png"
     history_dir = dst.parent / ".cover_history"
     history_dir.mkdir(parents=True, exist_ok=True)
@@ -2598,7 +2816,7 @@ async def build(hook, scenes, d, dst, tag=None):
     start_variant = random.SystemRandom().randrange(0, 12)
     for attempt in range(12):
         variant = (start_variant + attempt) % 12
-        await render_pages([(cover_html(hook, cover_kind, variant, font_head, font_css),
+        await render_pages([(cover_html(hook, cover_kind, variant, teaser, font_head, font_css),
                              [(cover_png, None, False)])], d)
         if hashlib.sha256(cover_png.read_bytes()).hexdigest() not in known:
             break
@@ -2606,18 +2824,21 @@ async def build(hook, scenes, d, dst, tag=None):
         print("[warn] could not make a pixel-unique cover; using the last variant.")
     (history_dir / f"{hashlib.sha256(cover_png.read_bytes()).hexdigest()[:16]}.png").write_bytes(cover_png.read_bytes())
 
-    # ---- page jobs
-    bg_png, brand_png, outro_png = d / "bg.png", d / "brand.png", d / "outro.png"
-    jobs = [(bg_html(font_head, font_css), [(bg_png, None, False)]),
-            (brand_html(font_head, font_css), [(brand_png, None, True)]),
-            (outro_html(font_head, font_css), [(outro_png, None, False)])]
-    slide_rows = [[]]
-    slide_no = 0
+    # ---- page jobs: 4 background variants, brand, outro, slides
+    bg_pngs = [d / f"bg{v}.png" for v in range(4)]
+    brand_png, outro_png = d / "brand.png", d / "outro.png"
+    jobs = [(bg_html(v, font_head, font_css), [(bg_pngs[v], None, False)]) for v in range(4)]
+    jobs += [(brand_html(font_head, font_css), [(brand_png, None, True)]),
+             (outro_html(font_head, font_css), [(outro_png, None, False)])]
+    slide_rows, slide_no = [[]], 0
     for k, sh in enumerate(shots, start=1):
+        stat_m = STAT_RE.match(sh["title"].strip()) if sh["title"] else None
         row = []
         for j, (txt, a, b) in enumerate(audio[k][1]):
             ip, cp = d / f"icon{k:02d}_{j:02d}.png", d / f"card{k:02d}_{j:02d}.png"
-            jobs.append((sub_html(txt, next(kind_iter), slide_no, font_head, font_css),
+            kind = next(kind_iter)
+            stat = sh["title"].strip() if (stat_m and j == 0) else None
+            jobs.append((sub_html(txt, kind, slide_no, font_head, font_css, stat=stat),
                          [(ip, "icon", True), (cp, "card", True)]))
             row.append((ip, cp, a, b))
             slide_no += 1
@@ -2626,22 +2847,41 @@ async def build(hook, scenes, d, dst, tag=None):
     await render_pages(jobs, d)
 
     # ---- clips
-    clips, durs = [], []
+    clips = []
     for i in range(n):
         clip = d / f"clip{i:02d}.mp4"
-        dur = audio[i][2]
         if i == 0:
-            scene_video(i, cover_png, None, [], dur, False, clip)
+            scene_video(i, cover_png, None, [], durs[i], False, clip, cover=True)
         elif i == n - 1:
-            scene_video(i, outro_png, None, [], dur, True, clip)
+            scene_video(i, outro_png, None, [], durs[i], True, clip)
         else:
-            scene_video(i, bg_png, brand_png, slide_rows[i], dur, False, clip)
+            scene_video(i, bg_pngs[(i - 1) % 4], brand_png, slide_rows[i], durs[i], False, clip)
         clips.append(clip)
-        durs.append(dur)
 
+    # ---- sound: voice + sfx + ducked bed
     voice = d / "voice.wav"
     concat_wavs([a[0] for a in audio], voice, d)
-    assemble(clips, durs, voice, pick_music(hook), dst)
+    starts = [sum(durs[:i]) for i in range(n)]
+    sfx_wav = bed = None
+    bed_is_music = False
+    if SFX:
+        events = [(0.0, "impact")]
+        for i in range(1, n):
+            events.append((starts[i] - 0.10, "whoosh"))
+            if i == n - 1:
+                events.append((starts[i] + 0.25, "ding"))
+            for j, (_, a, _) in enumerate(audio[i][1]):
+                if j > 0:
+                    events.append((starts[i] + a, "pop"))
+        sfx_wav = d / "sfx.wav"
+        make_sfx(events, total, sfx_wav)
+    music = pick_music(hook)
+    if music:
+        bed, bed_is_music = music, True
+    elif BED:
+        bed = d / "bed.wav"
+        make_bed(total, bed)
+    assemble(clips, durs, voice, sfx_wav, bed, bed_is_music, dst)
     (dst.parent / "cover.png").write_bytes(cover_png.read_bytes())
 
     runs.append([cover_kind, *kinds])
@@ -2649,7 +2889,6 @@ async def build(hook, scenes, d, dst, tag=None):
         hist_path.write_text(json.dumps({"runs": runs[-4:]}), encoding="utf-8")
     except OSError:
         pass
-    total = sum(durs)
     print(f"Build completed successfully: {dst}")
     print(f"  length {total:.1f}s | {len(kinds)} slides | {len(set(kinds) | {cover_kind})} unique icons")
     if total > MAX_REEL_SECONDS:
