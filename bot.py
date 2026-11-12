@@ -15,7 +15,7 @@ Pipeline per message
   3. hook booster    -> short, curiosity-driven hook (headline spoken first + shown on the cover)
   4. local polish    -> Persian typography, closing punctuation for natural pauses
   5. make_reel.py    -> numbers/Latin terms are converted for the voice there (۹۰٪ -> «نود درصد»)
-  6. Telegram        -> video + cover image + ready-to-paste caption
+  6. Telegram        -> the video + a ready-to-paste caption (no separate cover image)
 """
 
 import json
@@ -68,7 +68,7 @@ TAG_MAP = [
 HELP = (
     "سلام! متن ریلز رو بفرست.\n\n"
     "متن به‌صورت خودکار ویرایش می‌شه، یک هوک قوی برای شروع ویدیو ساخته می‌شه، "
-    "ویدیو رندر می‌شه و ویدیو + کاور + کپشن برات ارسال می‌شه.\n"
+    "ویدیو رندر می‌شه و ویدیو + کپشن برات ارسال می‌شه.\n"
     "نیازی به انتخاب دکمه یا تأیید دستی نیست.\n\n"
     "نکته‌ها:\n"
     "• هر پاراگراف (با یک خط خالی) یک صحنه می‌شه.\n"
@@ -613,13 +613,6 @@ def send_results(job, video):
     if not ok:
         say("⚠️ ویدیو ساخته شد ولی ارسالش به تلگرام ناموفق بود.\n" + run_url())
         return False
-
-    cover = video.with_name("cover.png")
-    if not cover.exists():
-        cover = video.parent / "cover.png"
-    if cover.exists():
-        curl_send("sendPhoto", "photo", cover,
-                  ["-F", "caption=🖼 کاور پیشنهادی (برای انتخاب به‌عنوان کاور ریلز)"])
 
     say("کپشن پیشنهادی (برای کپی):")
     say(make_caption(job.read_text(encoding="utf-8")))
