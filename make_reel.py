@@ -57,7 +57,7 @@ SAFE_BOTTOM = 670
 SAFE_SIDE = 80
 MAX_CHARS = 58                   # max characters per on-screen sentence chunk
 OPENING_LEAD = 0.3               # short silence so the opening impact never covers the first word
-COVER_PAUSE = 0.30               # pause after the spoken hook
+COVER_PAUSE = 0.40               # pause after the spoken hook (>= XFADE, the transition lives here)
 COVER_MIN = 1.8                  # hook screen is at least this long
 PAUSE_SENT = 0.40                # pause after . ! ? …
 PAUSE_CLAUSE = 0.18              # pause after ، ؛ :
@@ -65,7 +65,7 @@ PAUSE_CONT = 0.10                # pause when a sentence continues
 SCENE_PAUSE = 0.50               # pause at the end of each scene
 END_PAUSE = 0.45                 # pause after the very last sentence
 OUTRO_MIN = 3.0                  # end card length (s), grows with the spoken CTA
-XFADE = 0.35                     # transition between scenes (s)
+XFADE = 0.30                     # scene transition; it happens inside the pause BEFORE the next voice line
 TRANSITIONS = ("fade", "smoothleft", "fade", "smoothright")
 ZOOM_END = 0.06                  # background zoom amount per scene (alternates in/out)
 RISE_T = 0.38                    # slide-in time of icon/card (s)
@@ -79,8 +79,8 @@ HOOK_SPEAK = True                # speak the full hook on the cover
 HOOK_RATE, HOOK_PITCH = "+4%", "+2Hz"   # slightly more energetic delivery for the hook only
 SFX = True                       # whoosh / pop / impact / ding
 BED = True                       # ambient bed (or mp3/wav from ./music) ducked under voice
-BED_VOLUME = 0.35
-SFX_VOLUME = 0.35
+BED_VOLUME = 0.40
+SFX_VOLUME = 0.14
 CRF_FINAL, PRESET_FINAL = 18, "medium"
 
 BRAND_NAME = "آقای استمرار | Mr.Continuity"
@@ -382,13 +382,13 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
 SR = 44100
 
 
-def _whoosh(rnd, dur=0.5, vol=0.7):
+def _whoosh(rnd, dur=0.42, vol=0.35):
     n = int(dur * SR)
     out, lp, slow = [0.0] * n, 0.0, 0.0
     ks = 1 - math.exp(-2 * math.pi * 180 / SR)
     for i in range(n):
         x = i / n
-        a = 1 - math.exp(-2 * math.pi * (300 + 3800 * x) / SR)
+        a = 1 - math.exp(-2 * math.pi * (260 + 2200 * x) / SR)
         lp += a * (rnd.uniform(-1, 1) - lp)
         slow += ks * (lp - slow)
         out[i] = (lp - slow) * (math.sin(math.pi * x) ** 2) * vol * 3.2
@@ -424,9 +424,11 @@ def make_sfx(events, total, path):
     """events: [(time_s, 'impact'|'whoosh'|'pop'|'ding')]  (never placed on top of speech) -> stereo wav, same length as the reel."""
     rnd = random.Random(7)
     buf = [0.0] * int((total + 1.5) * SR)
-    for t, kind in events:
-        snd = {"impact": lambda: _impact(rnd), "whoosh": lambda: _whoosh(rnd),
-               "pop": lambda: _pop(rnd), "ding": _ding}[kind]()
+    for ev in events:                      # (time, kind) or (time, kind, gain)
+        t, kind = ev[0], ev[1]
+        gain = ev[2] if len(ev) > 2 else 1.0
+        snd = [v * gain for v in {"impact": lambda: _impact(rnd), "whoosh": lambda: _whoosh(rnd),
+                                  "pop": lambda: _pop(rnd), "ding": _ding}[kind]()]
         start = max(int(t * SR), 0)
         for i, v in enumerate(snd):
             if start + i >= len(buf):
@@ -632,7 +634,11 @@ KEYWORDS = {
   "روانشناسی",
   "ذهنیت",
   "تفکر",
-  "شناخت"
+  "شناخت",
+  "روان",
+  "روانی",
+  "پدیده",
+  "سندروم"
  ],
  "thought": [
   "فکر کردن",
@@ -705,8 +711,7 @@ KEYWORDS = {
   "داده",
   "گزارش",
   "تحلیل",
-  "بازده",
-  "مقایسه"
+  "بازده"
  ],
  "growth": [
   "افزایش درآمد",
@@ -788,7 +793,11 @@ KEYWORDS = {
   "جواهر",
   "ممتاز",
   "برند",
-  "کیفیت"
+  "کیفیت",
+  "کمالگرایی",
+  "بینقص",
+  "بی نقص",
+  "کمال"
  ],
  "gold_bar": [
   "سرمایه گذاری",
@@ -870,7 +879,6 @@ KEYWORDS = {
  "calendar_check": [
   "برنامه روزانه",
   "چالش",
-  "انجام",
   "چک",
   "تیک",
   "روزشمار",
@@ -950,8 +958,8 @@ KEYWORDS = {
   "پشتکار"
  ],
  "stairs": [
-  "گام به گام",
   "قدم به قدم",
+  "گام به گام",
   "به تدریج",
   "گام",
   "قدم",
@@ -974,7 +982,10 @@ KEYWORDS = {
   "برنده",
   "قهرمانی",
   "جام",
-  "فتح"
+  "فتح",
+  "موفقیت",
+  "به دست آوردی",
+  "به دست آورده"
  ],
  "medal": [
   "مدال",
@@ -983,7 +994,11 @@ KEYWORDS = {
   "برتر",
   "نخست",
   "عالی",
-  "ماهر"
+  "ماهر",
+  "توانایی",
+  "استعداد",
+  "شایستگی",
+  "لیاقت"
  ],
  "podium": [
   "رقابت",
@@ -1247,9 +1262,9 @@ KEYWORDS = {
   "ترس",
   "نگرانی",
   "اضطراب",
-  "دلسوزی",
-  "همدردی",
-  "دلسوز"
+  "عزت نفس",
+  "خودشناسی",
+  "خودپذیری"
  ],
  "smile": [
   "خنده",
@@ -1259,7 +1274,9 @@ KEYWORDS = {
   "رضایت",
   "آرامش",
   "خوشبخت",
-  "خوشحالی"
+  "خوشحالی",
+  "مثبت",
+  "مثبتاندیشی"
  ],
  "sad": [
   "غم",
@@ -1270,7 +1287,11 @@ KEYWORDS = {
   "امید",
   "ناامیدی",
   "گریه",
-  "ناراحتی"
+  "ناراحتی",
+  "ناکافی",
+  "ناتوان",
+  "ضعف",
+  "بیارزش"
  ],
  "ear": [
   "شنیدن حرف",
@@ -1301,7 +1322,13 @@ KEYWORDS = {
   "دورویی",
   "نقاب",
   "تظاهر",
-  "ماسک"
+  "ماسک",
+  "ایمپاستر",
+  "ایمپوستر",
+  "فریبکار",
+  "شیاد",
+  "جعلی",
+  "ساختگی"
  ],
  "shield": [
   "امنیت",
@@ -1311,7 +1338,10 @@ KEYWORDS = {
   "دفاع",
   "ایمن",
   "اطمینان",
-  "اعتبار"
+  "اعتبار",
+  "اعتماد به نفس",
+  "خودباوری",
+  "خودباور"
  ],
  "lock": [
   "حریم خصوصی",
@@ -1576,16 +1606,16 @@ KEYWORDS = {
  ],
  "fingerprint": [
   "منحصر به فرد",
-  "برند شخصی",
   "اثر انگشت",
+  "برند شخصی",
   "هویت",
   "اصالت",
   "امضا",
   "شخصیت"
  ],
  "blockchain": [
-  "smart contract",
   "قرارداد هوشمند",
+  "smart contract",
   "بلاکچین",
   "بلاک",
   "چین",
@@ -1688,7 +1718,9 @@ KEYWORDS = {
   "گفتگو",
   "مذاکره",
   "بحث",
-  "مکالمه"
+  "مکالمه",
+  "بازخورد",
+  "نظر دیگران"
  ],
  "chat": [
   "پیام",
@@ -1959,8 +1991,7 @@ KEYWORDS = {
   "بالانس",
   "سنجش",
   "ترازو",
-  "انتقاد",
-  "نقد"
+  "مقایسه"
  ],
  "lightning": [
   "برق",
@@ -2098,8 +2129,8 @@ KEYWORDS = {
   "سیو"
  ],
  "user_plus": [
-  "دنبال کن",
   "همراه شو",
+  "دنبال کن",
   "ثبت نام",
   "فالو کن",
   "عضو شو",
@@ -2380,7 +2411,8 @@ RELATED = {
 
 SUFFIXES = {"ها", "های", "هایی", "ی", "یی", "ش", "ت", "م", "مان", "تان", "شان", "ان", "ات", "ین",
             "ه", "هایش", "هایت", "هایم", "هایمان", "هایتان", "هایشان", "ای", "تر", "ترین", "را",
-            "مان", "اش", "ام"}
+            "مان", "اش", "ام", "هات", "هام", "هاش", "هامون", "هاتون", "هاشون", "مون", "تون", "شون",
+            "یم", "ید", "ست", "ئی"}
 
 
 # neutral, positive icons for sentences that match no keyword
@@ -2403,12 +2435,13 @@ def _score(text, terms_by_icon):
                 if f" {term} " in joined:
                     s += 2.5
                 continue
+            bonus = 0.6 / _FREQ.get(term, 1)       # rarer (more specific) keywords weigh more
             for tk in toks:
                 if tk == term:
-                    s += 1.5
+                    s += 1.5 + bonus
                     break
                 if len(term) > 3 and tk.startswith(term) and tk[len(term):] in SUFFIXES:
-                    s += 1.2
+                    s += 1.2 + bonus
                     break
         if s:
             out[kind] = s
@@ -2416,6 +2449,10 @@ def _score(text, terms_by_icon):
 
 
 _NORM_KW = {k: [norm(t) for t in v] for k, v in KEYWORDS.items()}
+_FREQ = {}
+for _terms in _NORM_KW.values():
+    for _t in set(_terms):
+        _FREQ[_t] = _FREQ.get(_t, 0) + 1
 
 
 def rank_icons(text, context=""):
@@ -2461,13 +2498,23 @@ def assign_unique_icon_kinds(items, reserved=(), recent=None):
 
 
 def icon_svg(kind, size=300):
+    """Glass-duotone icon: gradient stroke + gradient fills + soft offset shadow for depth."""
     if kind not in ICONS:
         kind = "spark"
-    gid = f"g_{kind}"
-    return (f"<svg class='ico' width='{size}' height='{size}' viewBox='0 0 120 120' aria-label='{kind}'>"
-            f"<defs><linearGradient id='{gid}' gradientUnits='userSpaceOnUse' x1='0' y1='0' x2='0' y2='120'>"
-            f"<stop offset='0' stop-color='#FFE6A8'/><stop offset='1' stop-color='{YELLOW}'/></linearGradient></defs>"
-            f"<g style='stroke:url(#{gid})'>{ICONS[kind]}</g></svg>")
+    body = ICONS[kind]
+    lit = (body.replace("class='f'", f"class='f' fill='url(#ff_{kind})'")
+               .replace("class='s'", f"class='s' fill='url(#gs_{kind})'"))
+    grad = "gradientUnits='userSpaceOnUse' x1='0' y1='0' x2='0' y2='120'"
+    return (f"<svg class='ico' width='{size}' height='{size}' viewBox='0 0 120 120' aria-label='{kind}'><defs>"
+            f"<linearGradient id='g_{kind}' {grad}><stop offset='0' stop-color='#FFE9B0'/>"
+            f"<stop offset='1' stop-color='{YELLOW}'/></linearGradient>"
+            f"<linearGradient id='ff_{kind}' {grad}><stop offset='0' stop-color='#FFE6A8' stop-opacity='.55'/>"
+            f"<stop offset='.6' stop-color='{YELLOW}' stop-opacity='.20'/>"
+            f"<stop offset='1' stop-color='#A86A00' stop-opacity='.16'/></linearGradient>"
+            f"<linearGradient id='gs_{kind}' {grad}><stop offset='0' stop-color='#FFE9B0'/>"
+            f"<stop offset='1' stop-color='{YELLOW}'/></linearGradient></defs>"
+            f"<g class='sh' transform='translate(2.5 4)'>{body}</g>"
+            f"<g style='stroke:url(#g_{kind})'>{lit}</g></svg>")
 
 
 # ------------------------------------------------------------------ HTML layouts
@@ -2499,7 +2546,12 @@ KEYWORDS_HL = ["استمرار", "موفقیت", "ثروت", "هدف", "ذهن",
                "رهبری", "اعتماد", "عادت", "تمرکز", "تصمیم", "انگیزه", "زمان", "استقلال", "مسئولیت", "انعطاف",
                "انتقاد", "پول", "ترس", "شکست", "آرامش", "اشتباه", "قدرت", "آزادی", "سرمایه", "فرصت"]
 _STOP_HL = {"این", "آن", "برای", "چون", "اما", "اگر", "باید", "باشد", "هست", "است", "شود", "یک", "از", "به",
-            "در", "با", "که", "را", "و", "همه", "هیچ", "بعد", "دیگر", "خیلی", "حتی", "هنوز"}
+            "در", "با", "که", "را", "و", "همه", "هیچ", "بعد", "دیگر", "خیلی", "حتی", "هنوز", "همیشه", "چیزی",
+            "کسی", "هرگز", "همین", "خود", "خودت", "چرا", "چطور", "چگونه", "وقتی", "هیچوقت", "بیشتر", "کمی",
+            "دوباره", "فقط", "واقعا", "واقعاً", "مثل", "یعنی", "بدون", "بعضی", "هرچی", "هر"}
+
+
+FA = "\u0621-\u063A\u0641-\u064A\u064B-\u0652\u067E\u0686\u0698\u06A9\u06AF\u06CC\u06C0"   # Persian letters only (no ؟ ، ؛)
 
 
 def pick_keywords(text, n=1):
@@ -2507,16 +2559,18 @@ def pick_keywords(text, n=1):
     nt = norm(text)
     found = [w for w in KEYWORDS_HL if norm(w) in nt]
     if len(found) < n:
-        cands = [w for w in re.findall(r"[\u0600-\u06FF]{4,}", text) if norm(w) not in _STOP_HL and w not in found]
-        cands.sort(key=lambda w: -len(norm(w)))
-        found += cands
+        words_ = re.findall(rf"[{FA}]{{4,}}", text)
+        cands = [(i, w) for i, w in enumerate(words_) if norm(w) not in _STOP_HL and w not in found]
+        # long content words win; later words get a small bonus (the punch usually lands at the end)
+        cands.sort(key=lambda iw: -(len(norm(iw[1])) + 0.6 * iw[0]))
+        found += [w for _, w in cands]
     return found[:n]
 
 
 def highlight_html(text, words):
     safe = html.escape(text)
     for w in words:      # colour the whole word (never a fragment, so Persian letters keep joining)
-        safe = re.sub(rf"(?<![\u0600-\u06FF\u200c])[\u0600-\u06FF\u200c]*{re.escape(w)}[\u0600-\u06FF\u200c]*",
+        safe = re.sub(rf"(?<![{FA}\u200c])[{FA}\u200c]*{re.escape(w)}[{FA}\u200c]*",
                       lambda m: f"<span class='kw'>{m.group(0)}</span>", safe, count=1)
     return safe
 
@@ -2540,10 +2594,11 @@ def base_css(font_css, transparent):
             f".bokeh i{{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(255,214,120,.55),rgba(255,214,120,0) 70%);"
             f"filter:blur(1.5px)}}"
             f".vig{{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,0) 50%,rgba(0,0,0,.62) 100%)}}"
-            f".ico{{fill:none;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;overflow:visible}}"
-            f".ico .f{{fill:rgba(242,169,0,.16)}}"
-            f".ico .d{{stroke:{LIGHT_GOLD};stroke-width:3.2;opacity:.92}}"
-            f".ico .s{{fill:{YELLOW};stroke:none}}"
+            f".ico{{fill:none;stroke-width:5.4;stroke-linecap:round;stroke-linejoin:round;overflow:visible}}"
+            f".ico .d{{stroke:{LIGHT_GOLD};stroke-width:3.3;opacity:.95}}"
+            f".ico .s{{stroke:none}}"
+            f".ico .sh{{stroke:#6b4300;opacity:.55;filter:blur(1.6px)}}"
+            f".ico .sh .f{{fill:rgba(0,0,0,.35)}}.ico .sh .d{{stroke:#6b4300}}.ico .sh .s{{fill:#6b4300}}"
             f".stage{{position:absolute;left:0;right:0;top:{STAGE_TOP}px;height:{STAGE_H}px;display:flex;"
             f"flex-direction:column;align-items:center;justify-content:center;gap:52px}}"
             f".brand{{position:absolute;left:50%;transform:translateX(-50%);top:{SAFE_TOP + 2}px;display:flex;align-items:center;"
@@ -2551,14 +2606,21 @@ def base_css(font_css, transparent):
             f"color:{LIGHT_GOLD};font-size:31px;font-weight:700;white-space:nowrap;direction:rtl}}"
             f".brand b{{width:12px;height:12px;border-radius:50%;background:{YELLOW};box-shadow:0 0 14px {YELLOW}}}"
             f".halo{{width:400px;height:400px;display:flex;align-items:center;justify-content:center;position:relative}}"
-            f".halo:before{{content:'';position:absolute;inset:14px;border:2px solid rgba(242,169,0,.32);"
-            f"box-shadow:0 0 70px rgba(242,169,0,.22),inset 0 0 50px rgba(242,169,0,.10);"
-            f"background:radial-gradient(circle,rgba(242,169,0,.12),rgba(0,0,0,0) 68%)}}"
-            f".halo.h0:before{{border-radius:50%}}"
-            f".halo.h1:before{{border-radius:34%}}"
-            f".halo.h2:before{{border-radius:50%;inset:6px;box-shadow:0 0 0 14px rgba(242,169,0,.07),0 0 70px rgba(242,169,0,.22)}}"
-            f".halo.h3:before{{border-radius:50%;border-style:dashed;border-width:3px}}"
-            f".halo .ico{{position:relative;filter:drop-shadow(0 12px 22px rgba(0,0,0,.55)) drop-shadow(0 0 22px rgba(242,169,0,.28))}}"
+            f".halo:before,.halo:after{{content:'';position:absolute;inset:14px}}"
+            f".halo:before{{border:3px solid transparent;"
+            f"background:linear-gradient(155deg,rgba(64,50,20,.96),rgba(14,13,16,.97) 55%,rgba(34,24,6,.96)) padding-box,"
+            f"linear-gradient(135deg,#FFE29A,#7a4d00 48%,{YELLOW}) border-box;"
+            f"box-shadow:0 26px 56px rgba(0,0,0,.62),0 0 64px rgba(242,169,0,.24),"
+            f"inset 0 2px 0 rgba(255,255,255,.16),inset 0 -26px 46px rgba(242,169,0,.12)}}"
+            f".halo:after{{background:radial-gradient(120% 70% at 28% 0%,rgba(255,255,255,.17),rgba(255,255,255,0) 55%);"
+            f"pointer-events:none}}"
+            f".halo.h0:before,.halo.h0:after{{border-radius:50%}}"
+            f".halo.h1:before,.halo.h1:after{{border-radius:32%}}"
+            f".halo.h2:before,.halo.h2:after{{border-radius:50%}}"
+            f".halo.h2:before{{outline:2px solid rgba(242,169,0,.28);outline-offset:12px}}"
+            f".halo.h3:before,.halo.h3:after{{border-radius:26%}}"
+            f".halo.h3:before{{outline:2px solid rgba(242,169,0,.22);outline-offset:12px}}"
+            f".halo .ico{{position:relative;z-index:2;filter:drop-shadow(0 0 20px rgba(242,169,0,.30))}}"
             f".kw{{color:{YELLOW};font-weight:800;text-shadow:0 0 18px rgba(242,169,0,.35)}}")
 
 
@@ -2644,23 +2706,24 @@ def cover_html(hook, kind, variant, teaser, font_head, font_css):
     Layers: chip / icon / hl animate in the video; the full page is the thumbnail."""
     sub = clean_display(hook)
     n = len(sub)
-    size = 160 if n <= 16 else 140 if n <= 28 else 120 if n <= 44 else 104 if n <= 64 else 88
+    size = 176 if n <= 16 else 154 if n <= 28 else 132 if n <= 44 else 112 if n <= 64 else 94
     css = (base_css(font_css, False) +
            f".stage{{gap:34px;text-align:center}}"
            f".chip{{display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#FFD35C,{YELLOW});"
            f"color:#14110a;border-radius:44px;padding:12px 38px;font-size:42px;font-weight:800;"
            f"box-shadow:0 10px 40px rgba(242,169,0,.35)}}"
-           f".chip .ico{{stroke:#14110a}}.chip .ico .f{{fill:rgba(20,17,10,.12)}}.chip .ico .d{{stroke:#14110a}}.chip .ico .s{{fill:#14110a}}"
+           f".chip .ico .sh{{display:none}}.chip .ico g{{stroke:#14110a !important}}.chip .ico .f{{fill:rgba(20,17,10,.12) !important}}"
+           f".chip .ico .d{{stroke:#14110a}}.chip .ico .s{{fill:#14110a !important}}"
            f".hl{{font-family:{DISPLAY};font-size:{size}px;font-weight:400;line-height:1.32;max-width:{CONTENT_W}px;"
            f"text-wrap:balance;text-shadow:0 8px 40px rgba(0,0,0,.8)}}"
            f".hl .kw{{font-weight:400}}"
            f".hl:after{{content:'';display:block;width:{140 + (variant % 4) * 26}px;height:6px;margin:26px auto 0;border-radius:8px;"
            f"background:linear-gradient(90deg,transparent,{YELLOW},transparent)}}"
-           f".halo{{width:380px;height:380px}}")
+           f".halo{{width:420px;height:420px}}")
     chip = (f"<div class='chip' data-layer='chip'>{icon_svg('stopwatch', 52)}<span>{html.escape(teaser)}</span></div>"
             if teaser else "")
     body = (f"{brand_div()}<div class='stage'>{chip}"
-            f"<div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 260)}</div>"
+            f"<div class='halo h{variant % 4}' data-layer='icon'>{icon_svg(kind, 290)}</div>"
             f"<div class='hl' data-layer='hl'>{highlight_html(sub, pick_keywords(sub, 2))}</div></div>")
     return page(body, css, font_head, bg=0)
 
@@ -2684,11 +2747,13 @@ def outro_html(font_head, font_css):
 
 
 _LAYER_JS = """(layer) => {
-  const only = layer !== null && layer !== '__none__';
+  const only = layer !== null && layer !== '__none__' && layer !== '__nobrand__';
   document.querySelectorAll('[data-layer]').forEach(e => {
     e.style.visibility = (layer === null || e.dataset.layer === layer) ? 'visible' : 'hidden'; });
-  document.querySelectorAll('.base,.art,.glow,.vig,.brand').forEach(e => {
+  document.querySelectorAll('.base,.art,.glow,.vig').forEach(e => {
     e.style.visibility = only ? 'hidden' : 'visible'; });
+  document.querySelectorAll('.brand').forEach(e => {
+    e.style.visibility = (only || layer === '__nobrand__') ? 'hidden' : 'visible'; });
   document.documentElement.style.background = document.body.style.background = only ? 'transparent' : '';
 }"""
 _BOX_JS = ("(layer) => { const e = document.querySelector(`[data-layer='${layer}']`); const r = e.getBoundingClientRect();"
@@ -2697,7 +2762,7 @@ _BOX_JS = ("(layer) => { const e = document.querySelector(`[data-layer='${layer}
 
 async def render_pages(jobs, d):
     """jobs: [(html, [(out_png, layer, transparent, clip), ...]), ...]
-    layer None = whole page, '-' = page without any layer, else only that data-layer.
+    layer None = whole page, '-' = background + brand only, '--' = background only, else one data-layer.
     clip=True crops the PNG to the layer's box (+margin) so it can be animated cheaply.
     Returns {out_png: (x, y, w, h)} for clipped layers."""
     from playwright.async_api import async_playwright
@@ -2712,8 +2777,8 @@ async def render_pages(jobs, d):
                 await page_.goto(f.as_uri(), wait_until="load")
                 await page_.evaluate("document.fonts.ready.then(() => true)")
                 for out, layer, transparent, clip in outs:
-                    await page_.evaluate(_LAYER_JS, layer if layer != "-" else "__none__")
-                    if clip and layer not in (None, "-"):
+                    await page_.evaluate(_LAYER_JS, {"-": "__none__", "--": "__nobrand__"}.get(layer, layer))
+                    if clip and layer not in (None, "-", "--"):
                         x, y, w, h = await page_.evaluate(_BOX_JS, layer)
                         m = 70
                         x0, y0 = max(int(x - m), 0), max(int(y - m), 0)
@@ -2746,7 +2811,7 @@ def _anim(style, s):
 def scene_video(idx, bg_png, brand_png, bokeh_png, layers, dur, is_last, out, cover=False):
     """bg (zoom/pan, alternating) + drifting bokeh + static brand + animated layers.
     layers: [(png, (x,y,w,h), start, end, style, anim_start)]"""
-    length = dur + (0 if is_last else XFADE)
+    length = dur + XFADE            # every clip overlaps its neighbours by XFADE
     frames = int(length * FPS) + 2
     f = f"on/{frames}"
     if cover:                                    # punch-in on the hook, then slow push
@@ -2825,7 +2890,8 @@ def assemble(clips, durs, voice_wav, sfx_wav, bed, bed_is_music, out):
     for i in range(1, len(clips)):
         start += durs[i - 1]
         tr = TRANSITIONS[(i - 1) % len(TRANSITIONS)]
-        fc += f"{last}[{i}:v]xfade=transition={tr}:duration={XFADE}:offset={start:.3f}[x{i}];"
+        # the transition ends exactly when the new scene's voice starts (it sits in the pause)
+        fc += f"{last}[{i}:v]xfade=transition={tr}:duration={XFADE}:offset={start - XFADE:.3f}[x{i}];"
         last = f"[x{i}]"
     fc += f"{last}noise=alls=1:allf=t,format=yuv420p[vn];"
     if SHOW_PROGRESS:
@@ -2933,7 +2999,7 @@ async def build(hook, scenes, d, dst, tag=None):
     cover_boxes = {}
     for attempt in range(12):
         variant = (start_variant + attempt) % 12
-        outs = [(cover_png, None, False, False), (cover_bg, "-", False, False)]
+        outs = [(cover_png, None, False, False), (cover_bg, "--", False, False)]
         outs += [(p, name, True, True) for name, p in cover_layers.items() if not (name == "chip" and not teaser)]
         cover_boxes = await render_pages([(cover_html(hook, cover_kind, variant, teaser, font_head, font_css), outs)], d)
         if hashlib.sha256(cover_png.read_bytes()).hexdigest() not in known:
@@ -2954,7 +3020,7 @@ async def build(hook, scenes, d, dst, tag=None):
     jobs = [(bg_html(v, font_head, font_css), [(bg_pngs[v], None, False, False)]) for v in range(4)]
     jobs += [(bokeh_html(v, font_head, font_css), [(bokeh_pngs[v], None, True, False)]) for v in range(4)]
     jobs += [(brand_html(font_head, font_css), [(brand_png, None, True, False)]),
-             (outro_html(font_head, font_css), [(outro_png, None, False, False), (outro_bg, "-", False, False)]
+             (outro_html(font_head, font_css), [(outro_png, None, False, False), (outro_bg, "--", False, False)]
               + [(p, name, True, True) for name, p in outro_layers.items()])]
     slide_rows, slide_no = [[]], 0
     for k, sh in enumerate(shots, start=1):
@@ -2983,22 +3049,23 @@ async def build(hook, scenes, d, dst, tag=None):
                 p = cover_layers[name]
                 if p in boxes:
                     lay.append((p, boxes[p], 0.0, durs[0], style, -0.30))
-            scene_video(i, cover_bg, None, bokeh_pngs[0], lay, durs[0], False, clip, cover=True)
+            scene_video(i, cover_bg, brand_png, bokeh_pngs[0], lay, durs[0], False, clip, cover=True)
         elif i == n - 1:
             lay, t0 = [], 0.15
             if outro_layers["slogan"] in boxes:
-                lay.append((outro_layers["slogan"], boxes[outro_layers["slogan"]], 0.0, durs[i], "rise", 0.0))
+                lay.append((outro_layers["slogan"], boxes[outro_layers["slogan"]], 0.0, durs[i] + XFADE, "rise", 0.0))
             for pi in range(len(CTA_ITEMS)):
                 p = outro_layers[f"p{pi}"]
                 if p in boxes:
-                    t_in = 0.35 + 0.22 * pi
-                    lay.append((p, boxes[p], t_in, durs[i], "pop", t_in))
-            scene_video(i, outro_bg, None, bokeh_pngs[2], lay, durs[i], True, clip)
+                    t_in = XFADE + 0.35 + 0.22 * pi        # clip starts XFADE before the scene
+                    lay.append((p, boxes[p], t_in, durs[i] + XFADE, "pop", t_in))
+            scene_video(i, outro_bg, brand_png, bokeh_pngs[2], lay, durs[i], True, clip)
         else:
             lay = []
+            sh = XFADE - 0.08          # clip starts XFADE before its voice; the card pops 0.08s early
             for ip, cp, a, b in slide_rows[i]:
-                lay.append((ip, boxes[ip], a, b, "pop", a))
-                lay.append((cp, boxes[cp], a, b, "rise", a + 0.07))
+                lay.append((ip, boxes[ip], a + sh, b + sh, "pop", a + sh))
+                lay.append((cp, boxes[cp], a + sh, b + sh, "rise", a + sh + 0.07))
             scene_video(i, bg_pngs[(i - 1) % 4], brand_png, bokeh_pngs[(i - 1) % 4], lay, durs[i], False, clip)
         clips.append(clip)
 
@@ -3009,10 +3076,13 @@ async def build(hook, scenes, d, dst, tag=None):
     sfx_wav = bed = None
     bed_is_music = False
     if SFX:
-        events = [(0.0, "impact")]                          # voice starts after OPENING_LEAD
+        events = [(0.0, "impact", 0.6)]                     # voice starts after OPENING_LEAD
         for i in range(1, n):
-            events.append((max(starts[i] - 0.5, 0.0), "whoosh"))   # ends right before the new scene's voice
-        events.append((max(total - 1.4, 0.0), "ding"))              # after the spoken CTA
+            soft = TRANSITIONS[(i - 1) % len(TRANSITIONS)] == "fade"
+            # whoosh peak = middle of the visual transition; it ends as the new voice line begins
+            events.append((max(starts[i] - XFADE - 0.06, 0.0), "whoosh", 0.40 if soft else 0.85))
+        speech_end = starts[n - 1] + (audio[n - 1][1][-1][2] - 0.5 if audio[n - 1][1] else 0.3)
+        events.append((max(min(speech_end, total - 1.1), 0.0), "ding", 0.55))   # right after the spoken CTA
         sfx_wav = d / "sfx.wav"
         make_sfx(events, total, sfx_wav)
     music = pick_music(hook)
