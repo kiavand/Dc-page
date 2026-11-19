@@ -7,6 +7,7 @@ Each sentence is spoken and shown on screen one at a time.
 
 Usage:  python make_reel.py input.txt out/reel.mp4
 Output: reel.mp4 and cover.png in the same folder.
+Voice:  Gemini TTS when GEMINI_API_KEY is set (Edge-TTS only as automatic fallback).
 
 What is standard in v6.0
   * HOOK: the full hook is spoken from frame 0 (no dead air), shown as a big poster
@@ -30,6 +31,7 @@ import asyncio
 import base64
 import hashlib
 import html
+import io
 import json
 import math
 import os
@@ -40,6 +42,8 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+import urllib.error
+import urllib.request
 import wave
 from pathlib import Path
 
@@ -71,8 +75,19 @@ ZOOM_END = 0.06                  # background zoom amount per scene (alternates 
 RISE_T = 0.38                    # slide-in time of icon/card (s)
 MUSIC_VOLUME = 0.12
 ANIM = True                      # pop / rise / drop motion on icons, cards and cover
-VOICE = "fa-IR-FaridNeural"      # Persian voice (Farid) - unchanged
-RATE = "+0%"                     # speaking rate, e.g. "+5%"
+# Main voice: Gemini TTS (needs the GEMINI_API_KEY environment variable / GitHub secret).
+GEMINI_MODEL = "gemini-3.8-flash-tts"            # override: env GEMINI_TTS_MODEL
+GEMINI_FALLBACK_MODEL = "gemini-3.8-flash-lite-tts"
+GEMINI_VOICE = "Algenib"                         # override: env GEMINI_TTS_VOICE
+GEMINI_STYLE = (                                 # override: env GEMINI_TTS_STYLE
+    "Speak in Iranian Persian (fa-IR). Use a mature male voice with a deep, warm, resonant and slightly "
+    "gravelly tone. Deliver the text as an emotional cinematic storyteller. Use natural dramatic pauses, "
+    "meaningful emphasis, a moderately slow pace and sincere emotion. Avoid an advertising-announcer style "
+    "and exaggerated acting.")
+TTS_CACHE = os.environ.get("TTS_CACHE", "1") != "0"   # reuse identical sentences (.tts_cache/); TTS_CACHE=0 = off
+# Fallback voice (Edge-TTS) - used only if Gemini is unavailable.
+VOICE = "fa-IR-FaridNeural"
+RATE = "+0%"                     # speaking rate for the fallback, e.g. "+5%"
 MAX_REEL_SECONDS = 60            # warn when the reel is longer
 SHOW_PROGRESS = True             # thin RTL progress bar above the content
 HOOK_SPEAK = True                # speak the full hook on the cover
@@ -214,13 +229,136 @@ def split_chunks(text, max_chars=MAX_CHARS):
     return merged
 
 
-# ------------------------------------------------------------------ Edge-TTS / audio
-async def tts(text, out_wav, retries=4, rate=None, pitch=None):
-    """Generate speech robustly; Edge-TTS occasionally returns an empty stream."""
-    text = (text or "").strip()
-    if not text:
-        raise ValueError("TTS received empty text.")
-    out_wav = Path(out_wav)
+# ------------------------------------------------------------------ TTS: Gemini first, Edge-TTS fallback
+_GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
+_GEMINI_DISABLED = False          # set after a fatal error (bad key etc.) so we stop retrying within one run
+_GEMINI_WARNED = False
+TTS_CACHE_DIR = Path(__file__).resolve().parent / ".tts_cache"
+
+
+class GeminiFatal(RuntimeError):
+    """Errors that retrying will not fix (bad key, bad request, unknown model)."""
+
+
+def _pct(s):
+    try:
+        return int(str(s).strip().rstrip("%"))
+    except ValueError:
+        return 0
+
+
+def _gemini_style(rate=None):
+    style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
+    if rate and _pct(rate) > _pct(RATE):        # hook line: a bit more energy, like HOOK_RATE did for Edge
+        style += " Deliver this line with slightly more energy and a touch faster pace."
+    return style
+
+
+def _pcm_to_wav(raw, mime=""):
+    """Gemini may return raw 16-bit PCM; wrap it in a WAV header (WAV is passed through)."""
+    if raw[:4] == b"RIFF":
+        return raw
+    m = re.search(r"rate=(\d+)", mime or "")
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(int(m.group(1)) if m else 24000)
+        wf.writeframes(raw)
+    return buf.getvalue()
+
+
+def _gemini_request(text, model, voice, style, api_key):
+    prompt = ("Generate speech from the transcript below. Read the transcript exactly, without adding, "
+              "removing or changing any word. Do not read the director's notes aloud.\n\n"
+              f"### DIRECTOR'S NOTES\n{style}\n\n### TRANSCRIPT\n{text}")
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}},
+        },
+    }
+    req = urllib.request.Request(
+        f"{_GEMINI_API}/{model}:generateContent",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")[:300]
+        if e.code in (400, 401, 403, 404):
+            raise GeminiFatal(f"HTTP {e.code} ({model}): {body}") from None
+        raise RuntimeError(f"HTTP {e.code} ({model}): {body}") from None
+
+    for cand in result.get("candidates", []):
+        for part in cand.get("content", {}).get("parts", []):
+            inline = part.get("inlineData") or part.get("inline_data")
+            if inline and inline.get("data"):
+                wav = _pcm_to_wav(base64.b64decode(inline["data"]),
+                                  inline.get("mimeType") or inline.get("mime_type") or "")
+                with wave.open(io.BytesIO(wav), "rb") as wf:
+                    secs = wf.getnframes() / float(wf.getframerate())
+                if len(wav) < 1024 or secs < 0.1:
+                    raise RuntimeError("Gemini returned too-short audio")
+                return wav
+    reason = (result.get("promptFeedback") or {}).get("blockReason")
+    raise RuntimeError(f"Gemini returned no audio (blockReason={reason})")
+
+
+async def gemini_tts(text, rate=None):
+    """Return WAV bytes from Gemini TTS (retries + model fallback), or None if unavailable."""
+    global _GEMINI_DISABLED, _GEMINI_WARNED
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if _GEMINI_DISABLED or not api_key:
+        if not api_key and not _GEMINI_WARNED:
+            _GEMINI_WARNED = True
+            print("[TTS] GEMINI_API_KEY not set - using Edge-TTS (set it for the higher-quality voice).", flush=True)
+        return None
+
+    primary = os.environ.get("GEMINI_TTS_MODEL", "").strip() or GEMINI_MODEL
+    models = list(dict.fromkeys([primary, GEMINI_FALLBACK_MODEL]))
+    voice = os.environ.get("GEMINI_TTS_VOICE", "").strip() or GEMINI_VOICE
+    style = _gemini_style(rate)
+
+    cache_file = None
+    if TTS_CACHE:
+        key = hashlib.sha1("\x00".join([models[0], voice, style, text]).encode("utf-8")).hexdigest()
+        cache_file = TTS_CACHE_DIR / f"{key}.wav"
+        if cache_file.exists() and cache_file.stat().st_size >= 1024:
+            return cache_file.read_bytes()
+
+    fatal = 0
+    for model in models:
+        for attempt in range(3):
+            try:
+                wav = await asyncio.to_thread(_gemini_request, text, model, voice, style, api_key)
+                if cache_file is not None:
+                    try:
+                        TTS_CACHE_DIR.mkdir(exist_ok=True)
+                        cache_file.write_bytes(wav)
+                    except OSError:
+                        pass
+                return wav
+            except GeminiFatal as exc:
+                fatal += 1
+                print(f"[TTS] Gemini {model}: {str(exc)[:200]}", flush=True)
+                break
+            except Exception as exc:
+                print(f"[TTS] Gemini {model} attempt {attempt + 1}/3 failed: {type(exc).__name__}: {str(exc)[:200]}",
+                      flush=True)
+                if attempt < 2:
+                    await asyncio.sleep(2 ** (attempt + 1))
+    if fatal == len(models):
+        _GEMINI_DISABLED = True
+        print("[TTS] Gemini is unusable (check GEMINI_API_KEY / model names) - Edge-TTS for the rest of this run.",
+              flush=True)
+    return None
+
+
+async def _edge_tts(text, out_wav, retries, rate, pitch):
     last_error = None
     for attempt in range(retries):
         try:
@@ -236,13 +374,27 @@ async def tts(text, out_wav, retries=4, rate=None, pitch=None):
             if attempt + 1 >= retries:
                 break
             delay = min(2 ** attempt, 12)
-            print(f"[TTS] Attempt {attempt + 1}/{retries} failed: {type(exc).__name__}: {exc}. "
+            print(f"[TTS] Edge attempt {attempt + 1}/{retries} failed: {type(exc).__name__}: {exc}. "
                   f"Retrying in {delay}s...", flush=True)
             await asyncio.sleep(delay)
-    raise RuntimeError(f"Edge-TTS failed after {retries} attempts for text: {text[:100]!r}. "
+    raise RuntimeError(f"All TTS providers failed for text: {text[:100]!r}. "
                        f"Last error: {type(last_error).__name__}: {last_error}") from last_error
 
 
+async def tts(text, out_wav, retries=4, rate=None, pitch=None):
+    """Speech for one sentence: Gemini TTS (primary voice), Edge-TTS only as a safety net."""
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("TTS received empty text.")
+    out_wav = Path(out_wav)
+    wav = await gemini_tts(text, rate=rate)
+    if wav:
+        out_wav.write_bytes(wav)
+        return
+    await _edge_tts(text, out_wav, retries, rate, pitch)
+
+
+# ------------------------------------------------------------------ audio helpers
 def run(cmd):
     try:
         subprocess.run(cmd, check=True, capture_output=True)
@@ -280,7 +432,7 @@ def concat_wavs(paths, dst, d):
 
 
 # --- speech preparation: numbers and Latin terms are converted for the voice only ---------------
-SPEECH_LEXICON = {      # Latin / symbol -> how Farid should say it (extend freely)
+SPEECH_LEXICON = {      # Latin / symbol -> how the voice should say it (extend freely)
     "AI": "ای آی", "ChatGPT": "چت جی پی تی", "GPT": "جی پی تی", "Instagram": "اینستاگرام",
     "YouTube": "یوتیوب", "Telegram": "تلگرام", "WhatsApp": "واتس اپ", "Google": "گوگل",
     "SEO": "اس ای او", "CEO": "سی ای او", "KPI": "کی پی آی", "OK": "اوکی", "ok": "اوکی",
