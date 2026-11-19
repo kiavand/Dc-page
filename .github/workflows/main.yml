@@ -21,6 +21,7 @@ jobs:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
     steps:
       - name: Checkout repository
@@ -45,6 +46,7 @@ jobs:
           test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Missing TELEGRAM_BOT_TOKEN"; exit 1; }
           test -n "$TELEGRAM_CHAT_ID" || { echo "::error::Missing TELEGRAM_CHAT_ID"; exit 1; }
           test -n "$HF_TOKEN" || { echo "::error::Missing HF_TOKEN"; exit 1; }
+          test -n "$GEMINI_API_KEY" || echo "::warning::GEMINI_API_KEY is missing - voice will fall back to Edge-TTS"
 
       - name: Poll Telegram messages
         id: poll
