@@ -7,7 +7,7 @@ Each sentence is spoken and shown on screen one at a time.
 
 Usage:  python make_reel.py input.txt out/reel.mp4
 Output: reel.mp4 and cover.png in the same folder.
-Voice:  Gemini 3.8 Flash TTS (Algenib, friendly, Persian) - cached; stops + notifies when the free quota ends.
+Voice:  Gemini 3.8 Flash TTS (Algenib, friendly, Persian), ONE request per reel, cached; stops + notifies when the free quota ends.
 
 What is standard in v6.0
   * HOOK: the full hook is spoken from frame 0 (no dead air), shown as a big poster
@@ -29,6 +29,7 @@ The background image is embedded at the very bottom of this file.
 import array
 import asyncio
 import base64
+import bisect
 import hashlib
 import html
 import io
@@ -338,7 +339,8 @@ def _quota_info(body):
 def _gemini_request(text, api_key):
     style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
     prompt = ("Generate speech from the transcript below. Read the transcript exactly, without adding, "
-              "removing or changing any word. Do not read the director's notes aloud.\n\n"
+              "removing or changing any word. Do not read the director's notes aloud. Leave a natural short pause "
+              "at every line break and a slightly longer one at every blank line.\n\n"
               f"### DIRECTOR'S NOTES\n{style}\n\n### TRANSCRIPT\n{text}")
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -353,7 +355,7 @@ def _gemini_request(text, api_key):
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
         method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=180) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", "replace")
@@ -393,13 +395,12 @@ def _prune_cache():
         pass
 
 
-async def tts(text, out_wav):
-    """Speech for one sentence (Gemini 3.8 Flash TTS, voice Algenib, friendly Persian), cached on disk."""
+async def synth(text):
+    """WAV bytes for `text` (Gemini 3.8 Flash TTS, voice Algenib, friendly Persian), cached on disk."""
     global _TTS_RECOVERED
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
-    out_wav = Path(out_wav)
 
     # 1) cache first: an identical sentence is never requested twice
     style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
@@ -409,9 +410,8 @@ async def tts(text, out_wav):
         cache_file = TTS_CACHE_DIR / f"{key}.wav"
         _prune_cache()
         if cache_file.exists() and cache_file.stat().st_size >= 1024:
-            out_wav.write_bytes(cache_file.read_bytes())
-            os.utime(cache_file)                     # keep recently used sentences
-            return
+            os.utime(cache_file)                     # keep recently used entries
+            return cache_file.read_bytes()
 
     # 2) request
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -457,7 +457,269 @@ async def tts(text, out_wav):
             cache_file.write_bytes(wav)
         except OSError:
             pass
-    out_wav.write_bytes(wav)
+    return wav
+
+
+async def tts(text, out_wav):
+    """One sentence -> WAV file (used when a chunk has no part of the whole-reel narration)."""
+    Path(out_wav).write_bytes(await synth(text))
+
+
+# ------------------------------------------------------------------ one request per reel
+# The whole narration is spoken in ONE request (1 request per reel instead of one per sentence), so the
+# voice, pace and emotion stay continuous. The audio is then cut back into the on-screen sentence chunks by
+# lining the cuts up with the real pauses in the audio (dynamic programming: cut on quiet moments, keep each
+# piece close to the length its text should take). Set TTS_MODE=sentence to go back to one request per sentence.
+TTS_MODE = os.environ.get("TTS_MODE", "reel").strip().lower()
+_VOICE_PARTS = {}                 # (scene index, chunk index) -> WAV bytes of that chunk
+
+
+def _wav_samples(wav_bytes):
+    with wave.open(io.BytesIO(wav_bytes), "rb") as wf:
+        rate, ch, width = wf.getframerate(), wf.getnchannels(), wf.getsampwidth()
+        raw = wf.readframes(wf.getnframes())
+    if width != 2:
+        raise RuntimeError("Unexpected WAV sample width")
+    s = array.array("h")
+    s.frombytes(raw)
+    if sys.byteorder == "big":
+        s.byteswap()
+    if ch > 1:
+        s = s[::ch]
+    return s, rate
+
+
+def _envelope_db(s, rate, hop):
+    n = max(int(rate * hop), 1)
+    out = []
+    for i in range(0, len(s) - n + 1, n):
+        ss = sum(x * x for x in s[i:i + n]) / n
+        out.append(10.0 * math.log10(ss + 1.0))
+    return out
+
+
+def _align_cuts(env, hop, weights, strong):
+    """Cut times (N-1) that split the audio into N pieces: on quiet moments, with piece lengths that follow the
+    text weights. Returns None if no consistent solution exists (caller falls back to proportional cuts)."""
+    N = len(weights)
+    if N <= 1:
+        return []
+    n = len(env)
+    ref = sorted(env)[int(0.9 * (n - 1))]
+    r = [e - ref for e in env]
+    loud = [x > -25 for x in r]
+    first = next((i for i in range(n - 2) if loud[i] and loud[i + 1] and loud[i + 2]), 0)
+    last = next((i for i in range(n - 1, 1, -1) if loud[i] and loud[i - 1] and loud[i - 2]), n - 1)
+    t0, t1 = first * hop, (last + 1) * hop
+    span = max(t1 - t0, 0.5)
+    sm = []
+    for i in range(n):
+        w = r[max(i - 2, 0):i + 3]
+        sm.append(sum(w) / len(w))
+
+    cands = {}                                         # frame -> silence length (s)
+    i = 0
+    while i < n:                                       # real pauses
+        if r[i] < -28:
+            j = i
+            while j < n and r[j] < -28:
+                j += 1
+            if (j - i) * hop >= 0.10 and t0 < i * hop and j * hop < t1:
+                cands[(i + j) // 2] = (j - i) * hop
+            i = j
+        else:
+            i += 1
+    for i in range(3, n - 3):                          # quiet dips inside speech
+        if i not in cands and t0 < i * hop < t1 and sm[i] <= sm[i - 1] and sm[i] < sm[i + 1]:
+            cands[i] = 0.0
+    step = max(int(0.25 / hop), 1)
+    for i in range(int(t0 / hop) + step, int(t1 / hop), step):   # grid, so a cut always exists
+        cands.setdefault(i, 0.0)
+    frames = sorted(cands)
+    times = [f * hop for f in frames]
+    pen = [min(max((sm[f] + 35.0) / 35.0, 0.0), 1.0) for f in frames]      # 0 = quiet, 1 = loud
+    sil = [cands[f] for f in frames]
+    K = len(frames)
+
+    total_w = float(sum(weights))
+    exp = [span * w / total_w for w in weights]
+
+    def seg_cost(i, d):
+        dev = (d - exp[i]) / max(exp[i], 0.6)
+        return 1.5 * dev * dev
+
+    def cut_cost(k, s):
+        reward = (0.4 + 0.6 * s) * min(sil[k], 0.6) / 0.6
+        return 0.7 * pen[k] - 1.0 * reward
+
+    INF = float("inf")
+    prev_t, prev_c, prev_k = [t0], [0.0], [-1]
+    back = []
+    for i in range(1, N):                              # choose cut i (end of piece i-1)
+        lo_d, hi_d = 0.15, 3.5 * exp[i - 1] + 1.0
+        cur_t, cur_c, cur_k, bk = [], [], [], {}
+        for k in range(K):
+            tk = times[k]
+            lo = bisect.bisect_left(prev_t, tk - hi_d)
+            hi = bisect.bisect_right(prev_t, tk - lo_d)
+            best, arg = INF, None
+            for j in range(lo, hi):
+                c = prev_c[j] + seg_cost(i - 1, tk - prev_t[j])
+                if c < best:
+                    best, arg = c, j
+            if arg is not None:
+                cur_t.append(tk)
+                cur_c.append(best + cut_cost(k, strong[i - 1]))
+                cur_k.append(k)
+                bk[k] = prev_k[arg]
+        if not cur_k:
+            return None
+        back.append(bk)
+        prev_t, prev_c, prev_k = cur_t, cur_c, cur_k
+    best, arg = INF, None
+    for j in range(len(prev_t)):
+        d = t1 - prev_t[j]
+        if d < 0.15:
+            continue
+        c = prev_c[j] + seg_cost(N - 1, d)
+        if c < best:
+            best, arg = c, prev_k[j]
+    if arg is None:
+        return None
+    cuts = [arg]
+    for layer in range(N - 1, 1, -1):
+        arg = back[layer - 1][arg]
+        cuts.append(arg)
+    cuts.reverse()
+    return [times[k] for k in cuts], [sil[k] for k in cuts]
+
+
+def _align_hier(env, hop, base, kinds):
+    """Two stages: (1) cut the audio into sentences on the long, reliable pauses; (2) inside every sentence, place
+    the remaining cuts using that sentence's own speaking speed. Returns (cut times, silence lengths) or None."""
+    N = len(base)
+    if N <= 1:
+        return [], []
+    weights = [base[i] + 5.0 * kinds[i] for i in range(N)]
+    groups, a = [], 0
+    for i in range(N - 1):
+        if kinds[i] >= 1.0:
+            groups.append((a, i + 1))
+            a = i + 1
+    groups.append((a, N))
+    total = len(env) * hop
+    gcuts, gsils = [], []
+    if len(groups) > 1:
+        res = _align_cuts(env, hop, [sum(weights[x:y]) for x, y in groups], [1.0] * (len(groups) - 1))
+        if res is None:
+            return None
+        gcuts, gsils = res
+    bounds = [0.0] + gcuts + [total]
+    cuts, sils = [], []
+    for gi, (x, y) in enumerate(groups):
+        if gi > 0:
+            cuts.append(bounds[gi])
+            sils.append(gsils[gi - 1])
+        if y - x < 2:
+            continue
+        w = [base[i] + 5.0 * kinds[i] for i in range(x, y - 1)] + [base[y - 1]]
+        sub = env[int(bounds[gi] / hop):int(bounds[gi + 1] / hop)]
+        res = _align_cuts(sub, hop, w, kinds[x:y - 1]) if len(sub) > 20 else None
+        if res is None:                                # proportional inside this sentence
+            dur, acc, tw = bounds[gi + 1] - bounds[gi], 0.0, float(sum(w))
+            sc, ss = [], []
+            for v in w[:-1]:
+                acc += v
+                sc.append(dur * acc / tw)
+                ss.append(0.0)
+        else:
+            sc, ss = res
+        cuts += [bounds[gi] + c for c in sc]
+        sils += ss
+    return cuts, sils
+
+
+def _split_wav(s, rate, cut_times):
+    pts = [0] + [int(t * rate) for t in cut_times] + [len(s)]
+    parts = []
+    for a, b in zip(pts, pts[1:]):
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(rate)
+            wf.writeframes(s[a:b].tobytes())
+        parts.append(buf.getvalue())
+    return parts
+
+
+def split_narration(wav, texts, kinds):
+    """texts: spoken text per chunk; kinds: 0 = continues, 0.5 = clause end, 1 = sentence/scene end (for the
+    chunk before the cut). Returns one WAV (bytes) per chunk."""
+    s, rate = _wav_samples(wav)
+    if len(texts) == 1:
+        return [wav]
+    base = [float(max(len(re.sub(r"[\W_]+", "", t)), 1)) for t in texts]
+    hop = 0.01
+    res = _align_hier(_envelope_db(s, rate, hop), hop, base, kinds)
+    if res is None:                                    # proportional fallback
+        total = len(s) / float(rate)
+        weights = [base[i] + 5.0 * kinds[i] for i in range(len(base))]
+        acc, cuts, sils = 0.0, [], []
+        for w in weights[:-1]:
+            acc += w
+            cuts.append(total * acc / sum(weights))
+            sils.append(0.0)
+    else:
+        cuts, sils = res
+    on_pause = sum(1 for x in sils if x >= 0.10)
+    print(f"[TTS] narration {len(s) / float(rate):.1f}s split into {len(texts)} chunks "
+          f"({on_pause}/{len(sils)} cuts on real pauses).", flush=True)
+    return _split_wav(s, rate, cuts)
+
+
+async def prepare_reel_voice(hook, shots, d):
+    """One TTS request for the whole reel; fills _VOICE_PARTS for build_scene_audio."""
+    _VOICE_PARTS.clear()
+    items = []                                         # (scene idx, chunk idx, spoken text)
+
+    def add(idx, chunks):
+        for j, ch in enumerate(chunks):
+            sp = tts_safe_text(speakable(ch))
+            if sp:
+                items.append((idx, j, sp))
+
+    if HOOK_SPEAK and tts_safe_text(hook):
+        add(0, [hook])
+    for k, sh in enumerate(shots, start=1):
+        add(k, sh["chunks"])
+    if CTA_SPEECH:
+        add(len(shots) + 1, [CTA_SPEECH])
+    if not items:
+        return
+
+    kinds, text = [], ""
+    for n_, (idx, j, sp) in enumerate(items):
+        text += sp
+        nxt = items[n_ + 1] if n_ + 1 < len(items) else None
+        if nxt is None:
+            kinds.append(1.0)
+        elif nxt[0] != idx:
+            kinds.append(1.0)
+            text += "\n\n"
+        elif sp.rstrip()[-1:] in ".؟?!…":
+            kinds.append(1.0)
+            text += "\n"
+        elif sp.rstrip()[-1:] in "،,؛;:":
+            kinds.append(0.5)
+            text += " "
+        else:
+            kinds.append(0.0)
+            text += " "
+    wav = await synth(text)
+    parts = split_narration(wav, [sp for _, _, sp in items], kinds)
+    for (idx, j, _), part in zip(items, parts):
+        _VOICE_PARTS[(idx, j)] = part
 
 
 # ------------------------------------------------------------------ audio helpers
@@ -577,7 +839,13 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
         pause = chunk_pause(ch, j == len(chunks) - 1, final_pause)
         spoken = tts_safe_text(speakable(ch))
         if spoken:
-            await tts(spoken, raw_audio)
+            part = _VOICE_PARTS.get((idx, j))
+            if part is not None:
+                raw_audio.write_bytes(part)
+                if pause == PAUSE_CONT:        # cut inside a sentence: re-join seamlessly, add no gap
+                    pause = 0.0
+            else:
+                await tts(spoken, raw_audio)
             to_wav(raw_audio, wav, pause)
         else:
             silence_wav(wav, pause + 0.6)   # emoji-only chunk: shown, not spoken
@@ -3178,6 +3446,8 @@ async def build(hook, scenes, d, dst, tag=None):
     (d / "bg_base.png").write_bytes(base64.b64decode(BACKGROUND_IMAGE_DATA.split(",", 1)[1]))
 
     # ---- audio: hook first (frame 0), scenes, spoken CTA
+    if TTS_MODE != "sentence":
+        await prepare_reel_voice(hook, shots, d)
     if HOOK_SPEAK and tts_safe_text(hook):
         audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN, final_pause=COVER_PAUSE,
                                          lead=OPENING_LEAD)]
