@@ -8,7 +8,6 @@ Required environment variables: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API
 Optional:
   HOOK_BOOST=0     keep the author's first sentence as the hook (default 1: an AI-written
                    punchy hook is added when the author did not write a "# hook" line)
-  MAX_WORDS=150    longest accepted text (a reel is at most 60 s long)
   QUOTA_PAUSE_MINUTES=60   how long building pauses after the Gemini quota ran out
 
 Pipeline per message
@@ -35,8 +34,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reel import (EXIT_CONFIG, EXIT_QUOTA, EXIT_TOO_LONG, UA, fix_persian, norm,
-                       strip_marks)
+from make_reel import EXIT_CONFIG, EXIT_QUOTA, UA, fix_persian, norm, strip_marks
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -52,7 +50,6 @@ OUT = Path("out")
 MAX_TG_BYTES = 48 * 1024 * 1024
 MAX_TRIES = 3                          # a broken job is moved to work/failed after this many runs
 HOOK_BOOST = os.environ.get("HOOK_BOOST", "1").strip() != "0"
-MAX_WORDS = int(os.environ.get("MAX_WORDS", "150") or 150)                  # a reel is at most 60 s
 QUOTA_PAUSE_MINUTES = int(os.environ.get("QUOTA_PAUSE_MINUTES", "60") or 60)
 
 BASE_TAGS = ["#ریلز", "#رشد_فردی", "#آموزش"]
@@ -82,7 +79,6 @@ HELP = (
     "نیازی به انتخاب دکمه یا تأیید دستی نیست.\n\n"
     "نکته‌ها:\n"
     "• هر پاراگراف (با یک خط خالی) یک صحنه می‌شه.\n"
-    f"• ریل حداکثر ۶۰ ثانیه‌ست؛ متن تا حدود {MAX_WORDS} کلمه قابل قبوله.\n"
     "• اگه می‌خوای هوک رو خودت بنویسی، خط اول رو با # شروع کن: # هوک من\n"
     "• اگه عنوان یک صحنه عدد باشه (مثل ۹۰٪)، عدد بزرگ روی صفحه نشون داده می‌شه:\n"
     "  ۹۰٪ :: بیشتر آدم‌ها این اشتباه رو می‌کنند."
@@ -553,13 +549,6 @@ def on_text(message, update_id):
         say("این دستور رو نمی‌شناسم. /help رو بزن.", **reply_to)
         return 0
 
-    # a reel is at most 60 s: refuse an obviously too long text before any AI / voice quota is spent
-    n_words = words(text)
-    if n_words > MAX_WORDS:
-        say(f"متن خیلی بلنده ({n_words} کلمه). ریل حداکثر ۶۰ ثانیه‌ست و متن باید حدود {MAX_WORDS} کلمه "
-            "یا کمتر باشه. لطفاً کوتاه‌ترش کن و دوباره بفرست.", **reply_to)
-        return 0
-
     say("متنت دریافت شد؛ دارم ویرایشش می‌کنم، هوک می‌سازم و ویدیو رو آماده می‌کنم.", **reply_to)
     if is_paused():
         say("⏸ تولید صدا فعلاً متوقفه (سهمیه‌ی Gemini تموم شده). متنت تو صف می‌مونه و "
@@ -727,12 +716,6 @@ def build():
                 pause_building()
                 print("TTS_STOPPED: building paused, job stays queued.")
                 break
-
-            # longer than 60 s: retrying cannot help, make_reel.py already told the author
-            if result.returncode == EXIT_TOO_LONG:
-                shutil.move(str(job), str(FAILED / job.name))
-                tries_path(job).unlink(missing_ok=True)
-                continue
 
             if result.returncode != 0 or not out.exists() or out.stat().st_size == 0:
                 if not give_up_if_needed(job):
