@@ -80,7 +80,7 @@ GEMINI_MODEL = "gemini-3.8-flash-tts"
 GEMINI_VOICE = "Algenib"
 GEMINI_STYLE = "Say in a friendly, warm and natural tone, in Iranian Persian (fa-IR)."   # style: Friendly
 TTS_CACHE = os.environ.get("TTS_CACHE", "1") != "0"   # reuse identical sentences; TTS_CACHE=0 = off
-MAX_REEL_SECONDS = 60            # hard limit: a longer reel is refused (before more quota is spent)
+REEL_NOTE_SECONDS = 60           # only a log note above this length - there is no limit and no error
 SHOW_PROGRESS = True             # thin RTL progress bar above the content
 HOOK_SPEAK = True                # speak the full hook on the cover
 SFX = True                       # whoosh / pop / impact / ding
@@ -241,11 +241,7 @@ class TTSConfigError(RuntimeError):
     """Missing / invalid GEMINI_API_KEY or unknown model: retrying will not help."""
 
 
-class ReelTooLong(RuntimeError):
-    """The reel would be longer than MAX_REEL_SECONDS."""
-
-
-EXIT_QUOTA, EXIT_CONFIG, EXIT_TOO_LONG = 3, 4, 5      # process exit codes, read by bot.py
+EXIT_QUOTA, EXIT_CONFIG = 3, 4                        # process exit codes, read by bot.py
 
 
 class _RateLimited(Exception):
@@ -719,12 +715,6 @@ async def prepare_reel_voice(hook, shots, d):
         else:
             kinds.append(0.0)
             text += " "
-    # refuse a script that is too long even at a fast speaking speed, BEFORE spending a request on it
-    fast = sum(len(re.sub(r"[\W_]+", "", sp)) for _, _, sp in items) / 16.0
-    est = (OPENING_LEAD + fast + PAUSE_SENT * kinds.count(1.0) + PAUSE_CLAUSE * kinds.count(0.5)
-           + (max(0.0, OUTRO_MIN - len(re.sub(r"[\W_]+", "", items[-1][2])) / 16.0) if CTA_SPEECH else OUTRO_MIN))
-    if est > MAX_REEL_SECONDS:
-        _too_long(est, hook)
     wav = await synth(text)
     parts = split_narration(wav, [sp for _, _, sp in items], kinds)
     for (idx, j, _), part in zip(items, parts):
@@ -3432,19 +3422,6 @@ def _load_history(path):
 STAT_RE = re.compile(r"^[\d۰-۹][\d۰-۹٫.,/٪%+×xX]*")
 
 
-def _too_long(total, hook):
-    notify_telegram("toolong:" + hashlib.sha1((hook or "").encode("utf-8")).hexdigest()[:8],
-                    f"⏱ این ریل از {MAX_REEL_SECONDS} ثانیه بیشتر می‌شود (حدود {total:.0f} ثانیه) و ساخته نشد. "
-                    "متن را کوتاه‌تر کن.")
-    raise ReelTooLong(f"Reel is about {total:.0f}s, the limit is {MAX_REEL_SECONDS}s - shorten the script.")
-
-
-def _enforce_limit(audio, hook):
-    total = sum(a[2] for a in audio)
-    if total > MAX_REEL_SECONDS:
-        _too_long(total, hook)
-
-
 async def build(hook, scenes, d, dst, tag=None):
     shots = []
     for i, sc in enumerate(scenes, start=1):
@@ -3468,21 +3445,20 @@ async def build(hook, scenes, d, dst, tag=None):
         sil = d / "cover_sil.wav"
         silence_wav(sil, COVER_MIN)
         audio = [(sil, [], COVER_MIN)]
-    _enforce_limit(audio, hook)
     for k, sh in enumerate(shots, start=1):
         audio.append(await build_scene_audio(k, sh["chunks"], d,
                                              final_pause=END_PAUSE if k == len(shots) else SCENE_PAUSE))
-        _enforce_limit(audio, hook)
     if CTA_SPEECH:
         audio.append(await build_scene_audio(len(shots) + 1, [CTA_SPEECH], d, min_total=OUTRO_MIN, final_pause=0.5))
     else:
         outro_wav = d / "outro.wav"
         silence_wav(outro_wav, OUTRO_MIN)
         audio.append((outro_wav, [], OUTRO_MIN))
-    _enforce_limit(audio, hook)
     n = len(audio)
     durs = [a[2] for a in audio]
     total = sum(durs)
+    if total > REEL_NOTE_SECONDS:
+        print(f"  [note] reel is {total:.0f}s long (no limit applies).")
 
     # ---- icons: meaning first, never repeated in a video, rotated across videos
     hist_dir = Path(os.environ.get("REEL_HISTORY_DIR") or dst.parent)   # share across videos
@@ -3631,9 +3607,6 @@ def main():
     except TTSConfigError as exc:
         print(f"STOPPED (config): {exc}", file=sys.stderr)
         sys.exit(EXIT_CONFIG)
-    except ReelTooLong as exc:
-        print(f"STOPPED (too long): {exc}", file=sys.stderr)
-        sys.exit(EXIT_TOO_LONG)
 
 
 # ------------------------------------------------------------------ embedded background image
