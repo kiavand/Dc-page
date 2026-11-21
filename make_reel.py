@@ -7,7 +7,7 @@ Each sentence is spoken and shown on screen one at a time.
 
 Usage:  python make_reel.py input.txt out/reel.mp4
 Output: reel.mp4 and cover.png in the same folder.
-Voice:  Gemini TTS when GEMINI_API_KEY is set (Edge-TTS only as automatic fallback).
+Voice:  Gemini 3.8 Flash TTS (Algenib, friendly, Persian) - cached; stops + notifies when the free quota ends.
 
 What is standard in v6.0
   * HOOK: the full hook is spoken from frame 0 (no dead air), shown as a big poster
@@ -41,13 +41,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unicodedata
 import urllib.error
 import urllib.request
 import wave
 from pathlib import Path
-
-import edge_tts
 
 # Shared User-Agent used by bot.py for reliable Telegram/API requests.
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -75,23 +74,14 @@ ZOOM_END = 0.06                  # background zoom amount per scene (alternates 
 RISE_T = 0.38                    # slide-in time of icon/card (s)
 MUSIC_VOLUME = 0.12
 ANIM = True                      # pop / rise / drop motion on icons, cards and cover
-# Main voice: Gemini TTS (needs the GEMINI_API_KEY environment variable / GitHub secret).
-GEMINI_MODEL = "gemini-3.8-flash-tts"            # override: env GEMINI_TTS_MODEL
-GEMINI_FALLBACK_MODEL = "gemini-3.8-flash-lite-tts"
-GEMINI_VOICE = "Algenib"                         # override: env GEMINI_TTS_VOICE
-GEMINI_STYLE = (                                 # override: env GEMINI_TTS_STYLE
-    "Speak in Iranian Persian (fa-IR). Use a mature male voice with a deep, warm, resonant and slightly "
-    "gravelly tone. Deliver the text as an emotional cinematic storyteller. Use natural dramatic pauses, "
-    "meaningful emphasis, a moderately slow pace and sincere emotion. Avoid an advertising-announcer style "
-    "and exaggerated acting.")
-TTS_CACHE = os.environ.get("TTS_CACHE", "1") != "0"   # reuse identical sentences (.tts_cache/); TTS_CACHE=0 = off
-# Fallback voice (Edge-TTS) - used only if Gemini is unavailable.
-VOICE = "fa-IR-FaridNeural"
-RATE = "+0%"                     # speaking rate for the fallback, e.g. "+5%"
-MAX_REEL_SECONDS = 60            # warn when the reel is longer
+# Voice: Gemini 3.8 Flash TTS only (needs the GEMINI_API_KEY environment variable / GitHub secret).
+GEMINI_MODEL = "gemini-3.8-flash-tts"
+GEMINI_VOICE = "Algenib"
+GEMINI_STYLE = "Say in a friendly, warm and natural tone, in Iranian Persian (fa-IR)."   # style: Friendly
+TTS_CACHE = os.environ.get("TTS_CACHE", "1") != "0"   # reuse identical sentences; TTS_CACHE=0 = off
+MAX_REEL_SECONDS = 60            # hard limit: a longer reel is refused (before more quota is spent)
 SHOW_PROGRESS = True             # thin RTL progress bar above the content
 HOOK_SPEAK = True                # speak the full hook on the cover
-HOOK_RATE, HOOK_PITCH = "+4%", "+2Hz"   # slightly more energetic delivery for the hook only
 SFX = True                       # whoosh / pop / impact / ding
 BED = True                       # ambient bed (or mp3/wav from ./music) ducked under voice
 BED_VOLUME = 0.40
@@ -229,33 +219,90 @@ def split_chunks(text, max_chars=MAX_CHARS):
     return merged
 
 
-# ------------------------------------------------------------------ TTS: Gemini first, Edge-TTS fallback
+# ------------------------------------------------------------------ TTS: Gemini 3.8 Flash TTS only
+# Usage policy: free quota first -> every generated sentence is cached (no repeated requests) ->
+# when the free quota is used up, generation STOPS and a Telegram notice is sent -> it only goes on
+# (paid) after billing is enabled on the Google project of the API key. Nothing else is ever used as voice.
 _GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/models"
-_GEMINI_DISABLED = False          # set after a fatal error (bad key etc.) so we stop retrying within one run
-_GEMINI_WARNED = False
-TTS_CACHE_DIR = Path(__file__).resolve().parent / ".tts_cache"
+TTS_CACHE_DIR = Path(os.environ.get("TTS_CACHE_DIR") or (Path(__file__).resolve().parent / ".tts_cache"))
+TTS_STATE_DIR = Path(os.environ.get("TTS_STATE_DIR") or "state")   # committed by the workflow
+TTS_NOTICE_HOURS = 6              # same Telegram notice is repeated at most this often (bot runs every 5 min)
+TTS_CACHE_DAYS = 14               # cached sentences unused for this long are deleted
+_TTS_PRUNED = False
+_TTS_RECOVERED = False
 
 
-class GeminiFatal(RuntimeError):
-    """Errors that retrying will not fix (bad key, bad request, unknown model)."""
+class TTSQuotaExhausted(RuntimeError):
+    """Free quota is used up (or the rate limit will not clear soon): generation must stop."""
 
 
-def _pct(s):
+class TTSConfigError(RuntimeError):
+    """Missing / invalid GEMINI_API_KEY or unknown model: retrying will not help."""
+
+
+class ReelTooLong(RuntimeError):
+    """The reel would be longer than MAX_REEL_SECONDS."""
+
+
+class _RateLimited(Exception):
+    def __init__(self, exhausted, retry, detail):
+        super().__init__(detail)
+        self.exhausted, self.retry = exhausted, retry
+
+
+# ---- Telegram notices (deduplicated, because a pending job is retried every 5 minutes)
+def _notice_path():
+    return TTS_STATE_DIR / "tts_notices.json"
+
+
+def _load_notices():
     try:
-        return int(str(s).strip().rstrip("%"))
-    except ValueError:
-        return 0
+        return json.loads(_notice_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
-def _gemini_style(rate=None):
-    style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
-    if rate and _pct(rate) > _pct(RATE):        # hook line: a bit more energy, like HOOK_RATE did for Edge
-        style += " Deliver this line with slightly more energy and a touch faster pace."
-    return style
+def _save_notices(data):
+    try:
+        TTS_STATE_DIR.mkdir(parents=True, exist_ok=True)
+        _notice_path().write_text(json.dumps(data), encoding="utf-8")
+    except OSError:
+        pass
 
 
+def notify_telegram(key, text):
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat:
+        return
+    data = _load_notices()
+    now = time.time()
+    if now - float(data.get(key, 0)) < TTS_NOTICE_HOURS * 3600:
+        return
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=json.dumps({"chat_id": chat, "text": text}).encode("utf-8"),
+        headers={"Content-Type": "application/json", "User-Agent": UA}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+    except Exception as exc:                      # never print the exception: the URL contains the bot token
+        print(f"[TTS] Telegram notice failed ({type(exc).__name__}).", flush=True)
+        return
+    data[key] = now
+    _save_notices(data)
+
+
+def _clear_notice(key):
+    data = _load_notices()
+    if key in data:
+        data.pop(key)
+        _save_notices(data)
+
+
+# ---- Gemini request
 def _pcm_to_wav(raw, mime=""):
-    """Gemini may return raw 16-bit PCM; wrap it in a WAV header (WAV is passed through)."""
+    """Gemini returns raw 16-bit PCM (24 kHz mono); wrap it in a WAV header (WAV is passed through)."""
     if raw[:4] == b"RIFF":
         return raw
     m = re.search(r"rate=(\d+)", mime or "")
@@ -268,7 +315,28 @@ def _pcm_to_wav(raw, mime=""):
     return buf.getvalue()
 
 
-def _gemini_request(text, model, voice, style, api_key):
+def _quota_info(body):
+    """Read a 429 body -> (exhausted, retry_seconds). Per-minute limits clear soon; daily/zero quota does not."""
+    try:
+        err = json.loads(body).get("error", {})
+    except ValueError:
+        return True, None
+    retry, daily = None, False
+    for det in err.get("details", []):
+        kind = str(det.get("@type", ""))
+        if kind.endswith("RetryInfo"):
+            m = re.match(r"([\d.]+)s", str(det.get("retryDelay", "")))
+            if m:
+                retry = float(m.group(1))
+        if kind.endswith("QuotaFailure"):
+            for v in det.get("violations", []):
+                if "PerDay" in str(v.get("quotaId", "")) or "PerDay" in str(v.get("quotaMetric", "")):
+                    daily = True
+    return (daily or retry is None or retry > 90), retry
+
+
+def _gemini_request(text, api_key):
+    style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
     prompt = ("Generate speech from the transcript below. Read the transcript exactly, without adding, "
               "removing or changing any word. Do not read the director's notes aloud.\n\n"
               f"### DIRECTOR'S NOTES\n{style}\n\n### TRANSCRIPT\n{text}")
@@ -276,11 +344,11 @@ def _gemini_request(text, model, voice, style, api_key):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseModalities": ["AUDIO"],
-            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}},
+            "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": GEMINI_VOICE}}},
         },
     }
     req = urllib.request.Request(
-        f"{_GEMINI_API}/{model}:generateContent",
+        f"{_GEMINI_API}/{GEMINI_MODEL}:generateContent",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
         method="POST")
@@ -288,10 +356,13 @@ def _gemini_request(text, model, voice, style, api_key):
         with urllib.request.urlopen(req, timeout=180) as resp:
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", "replace")[:300]
+        body = e.read().decode("utf-8", "replace")
+        if e.code == 429:
+            exhausted, retry = _quota_info(body)
+            raise _RateLimited(exhausted, retry, body[:200]) from None
         if e.code in (400, 401, 403, 404):
-            raise GeminiFatal(f"HTTP {e.code} ({model}): {body}") from None
-        raise RuntimeError(f"HTTP {e.code} ({model}): {body}") from None
+            raise TTSConfigError(f"Gemini HTTP {e.code}: {body[:300]}") from None
+        raise RuntimeError(f"HTTP {e.code}: {body[:200]}") from None
 
     for cand in result.get("candidates", []):
         for part in cand.get("content", {}).get("parts", []):
@@ -308,90 +379,85 @@ def _gemini_request(text, model, voice, style, api_key):
     raise RuntimeError(f"Gemini returned no audio (blockReason={reason})")
 
 
-async def gemini_tts(text, rate=None):
-    """Return WAV bytes from Gemini TTS (retries + model fallback), or None if unavailable."""
-    global _GEMINI_DISABLED, _GEMINI_WARNED
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if _GEMINI_DISABLED or not api_key:
-        if not api_key and not _GEMINI_WARNED:
-            _GEMINI_WARNED = True
-            print("[TTS] GEMINI_API_KEY not set - using Edge-TTS (set it for the higher-quality voice).", flush=True)
-        return None
-
-    primary = os.environ.get("GEMINI_TTS_MODEL", "").strip() or GEMINI_MODEL
-    models = list(dict.fromkeys([primary, GEMINI_FALLBACK_MODEL]))
-    voice = os.environ.get("GEMINI_TTS_VOICE", "").strip() or GEMINI_VOICE
-    style = _gemini_style(rate)
-
-    cache_file = None
-    if TTS_CACHE:
-        key = hashlib.sha1("\x00".join([models[0], voice, style, text]).encode("utf-8")).hexdigest()
-        cache_file = TTS_CACHE_DIR / f"{key}.wav"
-        if cache_file.exists() and cache_file.stat().st_size >= 1024:
-            return cache_file.read_bytes()
-
-    fatal = 0
-    for model in models:
-        for attempt in range(3):
-            try:
-                wav = await asyncio.to_thread(_gemini_request, text, model, voice, style, api_key)
-                if cache_file is not None:
-                    try:
-                        TTS_CACHE_DIR.mkdir(exist_ok=True)
-                        cache_file.write_bytes(wav)
-                    except OSError:
-                        pass
-                return wav
-            except GeminiFatal as exc:
-                fatal += 1
-                print(f"[TTS] Gemini {model}: {str(exc)[:200]}", flush=True)
-                break
-            except Exception as exc:
-                print(f"[TTS] Gemini {model} attempt {attempt + 1}/3 failed: {type(exc).__name__}: {str(exc)[:200]}",
-                      flush=True)
-                if attempt < 2:
-                    await asyncio.sleep(2 ** (attempt + 1))
-    if fatal == len(models):
-        _GEMINI_DISABLED = True
-        print("[TTS] Gemini is unusable (check GEMINI_API_KEY / model names) - Edge-TTS for the rest of this run.",
-              flush=True)
-    return None
+def _prune_cache():
+    global _TTS_PRUNED
+    if _TTS_PRUNED:
+        return
+    _TTS_PRUNED = True
+    limit = time.time() - TTS_CACHE_DAYS * 86400
+    try:
+        for f in TTS_CACHE_DIR.glob("*.wav"):
+            if f.stat().st_mtime < limit:
+                f.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
-async def _edge_tts(text, out_wav, retries, rate, pitch):
-    last_error = None
-    for attempt in range(retries):
-        try:
-            out_wav.unlink(missing_ok=True)
-            communicate = edge_tts.Communicate(text, VOICE, rate=rate or RATE, pitch=pitch or "+0Hz")
-            await asyncio.wait_for(communicate.save(str(out_wav)), timeout=90)
-            if not out_wav.exists() or out_wav.stat().st_size < 1024:
-                raise RuntimeError("Edge-TTS returned an empty or incomplete audio file.")
-            return
-        except Exception as exc:
-            last_error = exc
-            out_wav.unlink(missing_ok=True)
-            if attempt + 1 >= retries:
-                break
-            delay = min(2 ** attempt, 12)
-            print(f"[TTS] Edge attempt {attempt + 1}/{retries} failed: {type(exc).__name__}: {exc}. "
-                  f"Retrying in {delay}s...", flush=True)
-            await asyncio.sleep(delay)
-    raise RuntimeError(f"All TTS providers failed for text: {text[:100]!r}. "
-                       f"Last error: {type(last_error).__name__}: {last_error}") from last_error
-
-
-async def tts(text, out_wav, retries=4, rate=None, pitch=None):
-    """Speech for one sentence: Gemini TTS (primary voice), Edge-TTS only as a safety net."""
+async def tts(text, out_wav):
+    """Speech for one sentence (Gemini 3.8 Flash TTS, voice Algenib, friendly Persian), cached on disk."""
+    global _TTS_RECOVERED
     text = (text or "").strip()
     if not text:
         raise ValueError("TTS received empty text.")
     out_wav = Path(out_wav)
-    wav = await gemini_tts(text, rate=rate)
-    if wav:
-        out_wav.write_bytes(wav)
-        return
-    await _edge_tts(text, out_wav, retries, rate, pitch)
+
+    # 1) cache first: an identical sentence is never requested twice
+    style = os.environ.get("GEMINI_TTS_STYLE", "").strip() or GEMINI_STYLE
+    cache_file = None
+    if TTS_CACHE:
+        key = hashlib.sha1("\x00".join([GEMINI_MODEL, GEMINI_VOICE, style, text]).encode("utf-8")).hexdigest()
+        cache_file = TTS_CACHE_DIR / f"{key}.wav"
+        _prune_cache()
+        if cache_file.exists() and cache_file.stat().st_size >= 1024:
+            out_wav.write_bytes(cache_file.read_bytes())
+            os.utime(cache_file)                     # keep recently used sentences
+            return
+
+    # 2) request
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        notify_telegram("config", "❌ کلید GEMINI_API_KEY تنظیم نشده؛ تولید صدا انجام نشد.")
+        raise TTSConfigError("GEMINI_API_KEY is missing")
+
+    wav = None
+    for attempt in range(1, 4):
+        try:
+            wav = await asyncio.to_thread(_gemini_request, text, api_key)
+            break
+        except _RateLimited as rl:
+            if rl.exhausted or attempt == 3:
+                print("[TTS] Gemini quota exhausted - generation stopped.", flush=True)
+                notify_telegram(
+                    "quota",
+                    "⚠️ سهمیه‌ی رایگان Gemini TTS تمام شد و تولید ریل متوقف شد.\n"
+                    "ادامه‌ی تولید پولی فقط با فعال کردن پرداخت (Billing) برای پروژه‌ی این کلید در "
+                    "Google AI Studio انجام می‌شود.")
+                raise TTSQuotaExhausted("Gemini TTS free quota exhausted") from None
+            wait = min((rl.retry or 30) + 1, 90)
+            print(f"[TTS] Gemini per-minute limit - waiting {wait:.0f}s...", flush=True)
+            await asyncio.sleep(wait)
+        except TTSConfigError as exc:
+            print(f"[TTS] {str(exc)[:200]}", flush=True)
+            notify_telegram("config", "❌ مشکل در کلید یا مدل Gemini TTS؛ تولید صدا متوقف شد. "
+                                      "GEMINI_API_KEY را بررسی کن.")
+            raise
+        except Exception as exc:
+            print(f"[TTS] Gemini attempt {attempt}/3 failed: {type(exc).__name__}: {str(exc)[:200]}", flush=True)
+            if attempt == 3:
+                raise RuntimeError(f"Gemini TTS failed after 3 attempts: {exc}") from exc
+            await asyncio.sleep(2 ** attempt)
+
+    if not _TTS_RECOVERED:                           # a request worked -> allow a fresh notice next time
+        _TTS_RECOVERED = True
+        _clear_notice("quota")
+        _clear_notice("config")
+    if cache_file is not None:
+        try:
+            TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            cache_file.write_bytes(wav)
+        except OSError:
+            pass
+    out_wav.write_bytes(wav)
 
 
 # ------------------------------------------------------------------ audio helpers
@@ -482,7 +548,7 @@ def speakable(text):
 
 
 def tts_safe_text(text):
-    """Remove pictographs/emoji and ZWNJ before TTS (Edge-TTS may reject emoji)."""
+    """Remove pictographs/emoji and ZWNJ before TTS (TTS may reject emoji)."""
     kept = [c for c in (text or "") if unicodedata.category(c)[0] in {"L", "N", "M", "P", "Z"}]
     return re.sub(r"\s+", " ", "".join(kept)).strip()
 
@@ -498,8 +564,7 @@ def chunk_pause(chunk, last, final_pause):
     return PAUSE_CONT
 
 
-async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAUSE, lead=0.0,
-                            rate=None, pitch=None):
+async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAUSE, lead=0.0):
     wavs, timing, t = [], [], 0.0
     if lead > 0:
         lead_wav = d / f"a{idx:02d}_lead.wav"
@@ -512,7 +577,7 @@ async def build_scene_audio(idx, chunks, d, min_total=0.0, final_pause=SCENE_PAU
         pause = chunk_pause(ch, j == len(chunks) - 1, final_pause)
         spoken = tts_safe_text(speakable(ch))
         if spoken:
-            await tts(spoken, raw_audio, rate=rate, pitch=pitch)
+            await tts(spoken, raw_audio)
             to_wav(raw_audio, wav, pause)
         else:
             silence_wav(wav, pause + 0.6)   # emoji-only chunk: shown, not spoken
@@ -3090,6 +3155,15 @@ def _load_history(path):
 STAT_RE = re.compile(r"^[\d۰-۹][\d۰-۹٫.,/٪%+×xX]*")
 
 
+def _enforce_limit(audio, hook):
+    total = sum(a[2] for a in audio)
+    if total > MAX_REEL_SECONDS:
+        notify_telegram("toolong:" + hashlib.sha1((hook or "").encode("utf-8")).hexdigest()[:8],
+                        f"⏱ این ریل از {MAX_REEL_SECONDS} ثانیه بیشتر می‌شود (حدود {total:.0f} ثانیه) و ساخته نشد. "
+                        "متن را کوتاه‌تر کن.")
+        raise ReelTooLong(f"Reel is {total:.0f}s, the limit is {MAX_REEL_SECONDS}s - shorten the script.")
+
+
 async def build(hook, scenes, d, dst, tag=None):
     shots = []
     for i, sc in enumerate(scenes, start=1):
@@ -3106,20 +3180,23 @@ async def build(hook, scenes, d, dst, tag=None):
     # ---- audio: hook first (frame 0), scenes, spoken CTA
     if HOOK_SPEAK and tts_safe_text(hook):
         audio = [await build_scene_audio(0, [hook], d, min_total=COVER_MIN, final_pause=COVER_PAUSE,
-                                         lead=OPENING_LEAD, rate=HOOK_RATE, pitch=HOOK_PITCH)]
+                                         lead=OPENING_LEAD)]
     else:
         sil = d / "cover_sil.wav"
         silence_wav(sil, COVER_MIN)
         audio = [(sil, [], COVER_MIN)]
+    _enforce_limit(audio, hook)
     for k, sh in enumerate(shots, start=1):
         audio.append(await build_scene_audio(k, sh["chunks"], d,
                                              final_pause=END_PAUSE if k == len(shots) else SCENE_PAUSE))
+        _enforce_limit(audio, hook)
     if CTA_SPEECH:
         audio.append(await build_scene_audio(len(shots) + 1, [CTA_SPEECH], d, min_total=OUTRO_MIN, final_pause=0.5))
     else:
         outro_wav = d / "outro.wav"
         silence_wav(outro_wav, OUTRO_MIN)
         audio.append((outro_wav, [], OUTRO_MIN))
+    _enforce_limit(audio, hook)
     n = len(audio)
     durs = [a[2] for a in audio]
     total = sum(durs)
@@ -3253,8 +3330,6 @@ async def build(hook, scenes, d, dst, tag=None):
         pass
     print(f"Build completed successfully: {dst}")
     print(f"  length {total:.1f}s | {len(kinds)} slides | {len(set(kinds) | {cover_kind})} unique icons")
-    if total > MAX_REEL_SECONDS:
-        print(f"  [warn] reel is longer than {MAX_REEL_SECONDS}s - consider shortening the script.")
 
 
 def main():
@@ -3264,8 +3339,13 @@ def main():
     hook, tag, scenes = parse(src.read_text(encoding="utf-8"))
     if not scenes:
         sys.exit("Input file has no scenes.")
-    with tempfile.TemporaryDirectory() as t:
-        asyncio.run(build(hook, scenes, Path(t), dst, tag))
+    try:
+        with tempfile.TemporaryDirectory() as t:
+            asyncio.run(build(hook, scenes, Path(t), dst, tag))
+    except TTSQuotaExhausted as exc:
+        sys.exit(f"STOPPED: {exc}")
+    except (TTSConfigError, ReelTooLong) as exc:
+        sys.exit(f"STOPPED: {exc}")
 
 
 # ------------------------------------------------------------------ embedded background image
