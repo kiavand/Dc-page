@@ -22,6 +22,7 @@ jobs:
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      TTS_CACHE_DIR: ${{ github.workspace }}/.tts_cache
 
     steps:
       - name: Checkout repository
@@ -46,7 +47,15 @@ jobs:
           test -n "$TELEGRAM_BOT_TOKEN" || { echo "::error::Missing TELEGRAM_BOT_TOKEN"; exit 1; }
           test -n "$TELEGRAM_CHAT_ID" || { echo "::error::Missing TELEGRAM_CHAT_ID"; exit 1; }
           test -n "$HF_TOKEN" || { echo "::error::Missing HF_TOKEN"; exit 1; }
-          test -n "$GEMINI_API_KEY" || echo "::warning::GEMINI_API_KEY is missing - voice will fall back to Edge-TTS"
+          test -n "$GEMINI_API_KEY" || { echo "::error::Missing GEMINI_API_KEY"; exit 1; }
+
+      - name: Restore voice cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .tts_cache
+          key: tts-${{ github.run_id }}
+          restore-keys: |
+            tts-
 
       - name: Poll Telegram messages
         id: poll
@@ -61,8 +70,16 @@ jobs:
           fc-cache -f
 
       - name: Build and send reels
+        id: build
         if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
         run: python bot.py build
+
+      - name: Save voice cache
+        if: always() && steps.build.conclusion != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: .tts_cache
+          key: tts-${{ github.run_id }}
 
       - name: Save polling state and pending jobs
         if: always() && (steps.poll.outputs.changed == 'true' || hashFiles('work/job_*.txt') != '')
