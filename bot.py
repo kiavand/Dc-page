@@ -4,18 +4,24 @@ Usage:
   python bot.py poll   # receive text, edit it, queue job
   python bot.py build  # render queued jobs and send them to Telegram
 
-Required environment variables: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+Required environment variables: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GEMINI_API_KEY (voice)
 Optional:
   HOOK_BOOST=0     keep the author's first sentence as the hook (default 1: an AI-written
                    punchy hook is added when the author did not write a "# hook" line)
+  MAX_WORDS=150    longest accepted text (a reel is at most 60 s long)
+  QUOTA_PAUSE_MINUTES=60   how long building pauses after the Gemini quota ran out
 
 Pipeline per message
   1. editor prompt   -> spelling, punctuation, pronunciation marks (content is never shortened)
   2. review prompt   -> second pass that restores anything the first pass dropped
   3. hook booster    -> short, curiosity-driven hook (headline spoken first + shown on the cover)
   4. local polish    -> Persian typography, closing punctuation for natural pauses
-  5. make_reel.py    -> numbers/Latin terms are converted for the voice there (۹۰٪ -> «نود درصد»)
+  5. make_reel.py    -> numbers/Latin terms are converted for the voice there (۹۰٪ -> «نود درصد»);
+                        voice = Gemini 3.8 Flash TTS (Algenib, friendly), ONE request per reel
   6. Telegram        -> the video + a ready-to-paste caption (no separate cover image)
+
+Voice quota: when the Gemini free quota ends, make_reel.py stops and sends a Telegram notice; the job stays
+queued, building pauses (QUOTA_PAUSE_MINUTES) and resumes by itself after the quota resets or billing is enabled.
 """
 
 import json
@@ -29,13 +35,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from make_reel import UA, fix_persian, norm, strip_marks
+from make_reel import (EXIT_CONFIG, EXIT_QUOTA, EXIT_TOO_LONG, UA, fix_persian, norm,
+                       strip_marks)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 API = f"https://api.telegram.org/bot{TOKEN}"
 
 STATE = Path("state/offset.txt")
+PAUSE_FILE = Path("state/tts_pause_until.txt")   # building is paused until this time (unix seconds)
 HISTORY = Path("state/history")        # icon / cover history shared by all videos
 WORK = Path("work")
 FAILED = WORK / "failed"
@@ -44,6 +52,8 @@ OUT = Path("out")
 MAX_TG_BYTES = 48 * 1024 * 1024
 MAX_TRIES = 3                          # a broken job is moved to work/failed after this many runs
 HOOK_BOOST = os.environ.get("HOOK_BOOST", "1").strip() != "0"
+MAX_WORDS = int(os.environ.get("MAX_WORDS", "150") or 150)                  # a reel is at most 60 s
+QUOTA_PAUSE_MINUTES = int(os.environ.get("QUOTA_PAUSE_MINUTES", "60") or 60)
 
 BASE_TAGS = ["#ریلز", "#رشد_فردی", "#آموزش"]
 
@@ -72,6 +82,7 @@ HELP = (
     "نیازی به انتخاب دکمه یا تأیید دستی نیست.\n\n"
     "نکته‌ها:\n"
     "• هر پاراگراف (با یک خط خالی) یک صحنه می‌شه.\n"
+    f"• ریل حداکثر ۶۰ ثانیه‌ست؛ متن تا حدود {MAX_WORDS} کلمه قابل قبوله.\n"
     "• اگه می‌خوای هوک رو خودت بنویسی، خط اول رو با # شروع کن: # هوک من\n"
     "• اگه عنوان یک صحنه عدد باشه (مثل ۹۰٪)، عدد بزرگ روی صفحه نشون داده می‌شه:\n"
     "  ۹۰٪ :: بیشتر آدم‌ها این اشتباه رو می‌کنند."
@@ -91,7 +102,7 @@ FORMAT_GUIDE = """قالب خروجی (دقیقاً رعایت شود):
   در محل مکث طبیعی تقسیم کن، بدون اینکه چیزی حذف یا اضافه شود.
 - هر صحنه باید با نقطه، علامت سؤال یا علامت تعجب تمام شود."""
 
-NARRATION_GUIDE = """راهنمای گویندگی حرفه‌ای (برای صدای fa-IR-FaridNeural):
+NARRATION_GUIDE = """راهنمای گویندگی حرفه‌ای (برای صدای Gemini با لحن دوستانه و فارسی ایران):
 - جمله‌ها را کوتاه و قابل‌نفس‌گیری نگه دار؛ هر جمله ترجیحاً کمتر از ۱۸ کلمه.
 - ویرگول را دقیقاً جایی بگذار که گوینده باید مکث کوتاه کند؛ نقطه برای مکث کامل.
 - پرسش‌های بلاغی را با «؟» تمام کن تا لحن پرسشی درست خوانده شود.
@@ -102,7 +113,7 @@ NARRATION_GUIDE = """راهنمای گویندگی حرفه‌ای (برای ص�
   واژه‌های ساده و روشن را اعراب‌گذاری نکن و هرگز اعراب حدسی نگذار."""
 
 EDITOR_PROMPT = f"""تو ویراستار و کارگردان صدا برای متن‌های ریلز فارسی هستی. صدای گوینده
-fa-IR-FaridNeural است. وظیفه تو بازنویسی یا خلاصه‌سازی نیست؛
+Gemini TTS (صدای Algenib، لحن دوستانه، فارسی ایران) است. وظیفه تو بازنویسی یا خلاصه‌سازی نیست؛
 فقط باید همان متن نویسنده را برای خواندن صحیح، طبیعی و حرفه‌ای آماده کنی.
 
 قوانین قطعی و غیرقابل نقض:
@@ -131,7 +142,7 @@ fa-IR-FaridNeural است. وظیفه تو بازنویسی یا خلاصه‌س�
 فقط متن نهایی را خروجی بده. هیچ توضیحی ننویس و از Markdown اضافی استفاده نکن.
 """
 
-REVIEW_PROMPT = f"""تو بازبین نهایی متن ریلز فارسی برای گویندگی با صدای fa-IR-FaridNeural هستی.
+REVIEW_PROMPT = f"""تو بازبین نهایی متن ریلز فارسی برای گویندگی با صدای Gemini TTS (لحن دوستانه، فارسی ایران) هستی.
 
 متن اصلی مرجع قطعی است. پیش‌نویس را با متن اصلی مقایسه کن و فقط املا، نگارش،
 نشانه‌گذاری و تلفظ را اصلاح کن.
@@ -231,6 +242,27 @@ def run_url():
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     run_id = os.environ.get("GITHUB_RUN_ID", "")
     return f"{server}/{repo}/actions/runs/{run_id}" if repo and run_id else ""
+
+
+# =========================================================
+# Voice quota pause (state/ is committed by the workflow)
+# =========================================================
+
+def paused_until():
+    try:
+        return float(PAUSE_FILE.read_text(encoding="utf-8").strip())
+    except Exception:
+        return 0.0
+
+
+def is_paused():
+    return time.time() < paused_until()
+
+
+def pause_building():
+    """Stop retrying for a while: the voice quota is used up (or the key is wrong)."""
+    PAUSE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PAUSE_FILE.write_text(str(time.time() + QUOTA_PAUSE_MINUTES * 60), encoding="utf-8")
 
 
 # =========================================================
@@ -521,7 +553,17 @@ def on_text(message, update_id):
         say("این دستور رو نمی‌شناسم. /help رو بزن.", **reply_to)
         return 0
 
+    # a reel is at most 60 s: refuse an obviously too long text before any AI / voice quota is spent
+    n_words = words(text)
+    if n_words > MAX_WORDS:
+        say(f"متن خیلی بلنده ({n_words} کلمه). ریل حداکثر ۶۰ ثانیه‌ست و متن باید حدود {MAX_WORDS} کلمه "
+            "یا کمتر باشه. لطفاً کوتاه‌ترش کن و دوباره بفرست.", **reply_to)
+        return 0
+
     say("متنت دریافت شد؛ دارم ویرایشش می‌کنم، هوک می‌سازم و ویدیو رو آماده می‌کنم.", **reply_to)
+    if is_paused():
+        say("⏸ تولید صدا فعلاً متوقفه (سهمیه‌ی Gemini تموم شده). متنت تو صف می‌مونه و "
+            "بعد از آزاد شدن سهمیه یا فعال شدن پرداخت خودکار ساخته می‌شه.")
 
     try:
         edited = improve(text)
@@ -582,6 +624,8 @@ def poll():
 
     set_output("jobs", jobs)
     set_output("changed", "true" if new_offset != offset else "false")
+    # while paused the workflow skips the heavy install/build steps (saves Actions minutes)
+    set_output("paused", "true" if is_paused() else "false")
 
 
 # =========================================================
@@ -658,6 +702,11 @@ def build():
         print("NO_PENDING_JOBS")
         return
 
+    if is_paused():
+        minutes = max(int((paused_until() - time.time()) / 60), 1)
+        print(f"TTS_PAUSED: voice quota/key problem, jobs stay queued (about {minutes} min left).")
+        return
+
     env = {**os.environ, "REEL_HISTORY_DIR": str(HISTORY)}
 
     for job in jobs:
@@ -671,6 +720,19 @@ def build():
 
             log = (result.stdout or "") + "\n" + (result.stderr or "")
             print(log[-4000:])
+
+            # voice quota used up / key problem: make_reel.py already sent the Telegram notice.
+            # The job stays queued (no failed try is counted) and building pauses for a while.
+            if result.returncode in (EXIT_QUOTA, EXIT_CONFIG):
+                pause_building()
+                print("TTS_STOPPED: building paused, job stays queued.")
+                break
+
+            # longer than 60 s: retrying cannot help, make_reel.py already told the author
+            if result.returncode == EXIT_TOO_LONG:
+                shutil.move(str(job), str(FAILED / job.name))
+                tries_path(job).unlink(missing_ok=True)
+                continue
 
             if result.returncode != 0 or not out.exists() or out.stat().st_size == 0:
                 if not give_up_if_needed(job):
