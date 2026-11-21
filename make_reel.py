@@ -245,6 +245,9 @@ class ReelTooLong(RuntimeError):
     """The reel would be longer than MAX_REEL_SECONDS."""
 
 
+EXIT_QUOTA, EXIT_CONFIG, EXIT_TOO_LONG = 3, 4, 5      # process exit codes, read by bot.py
+
+
 class _RateLimited(Exception):
     def __init__(self, exhausted, retry, detail):
         super().__init__(detail)
@@ -716,6 +719,12 @@ async def prepare_reel_voice(hook, shots, d):
         else:
             kinds.append(0.0)
             text += " "
+    # refuse a script that is too long even at a fast speaking speed, BEFORE spending a request on it
+    fast = sum(len(re.sub(r"[\W_]+", "", sp)) for _, _, sp in items) / 16.0
+    est = (OPENING_LEAD + fast + PAUSE_SENT * kinds.count(1.0) + PAUSE_CLAUSE * kinds.count(0.5)
+           + (max(0.0, OUTRO_MIN - len(re.sub(r"[\W_]+", "", items[-1][2])) / 16.0) if CTA_SPEECH else OUTRO_MIN))
+    if est > MAX_REEL_SECONDS:
+        _too_long(est, hook)
     wav = await synth(text)
     parts = split_narration(wav, [sp for _, _, sp in items], kinds)
     for (idx, j, _), part in zip(items, parts):
@@ -3423,13 +3432,17 @@ def _load_history(path):
 STAT_RE = re.compile(r"^[\d۰-۹][\d۰-۹٫.,/٪%+×xX]*")
 
 
+def _too_long(total, hook):
+    notify_telegram("toolong:" + hashlib.sha1((hook or "").encode("utf-8")).hexdigest()[:8],
+                    f"⏱ این ریل از {MAX_REEL_SECONDS} ثانیه بیشتر می‌شود (حدود {total:.0f} ثانیه) و ساخته نشد. "
+                    "متن را کوتاه‌تر کن.")
+    raise ReelTooLong(f"Reel is about {total:.0f}s, the limit is {MAX_REEL_SECONDS}s - shorten the script.")
+
+
 def _enforce_limit(audio, hook):
     total = sum(a[2] for a in audio)
     if total > MAX_REEL_SECONDS:
-        notify_telegram("toolong:" + hashlib.sha1((hook or "").encode("utf-8")).hexdigest()[:8],
-                        f"⏱ این ریل از {MAX_REEL_SECONDS} ثانیه بیشتر می‌شود (حدود {total:.0f} ثانیه) و ساخته نشد. "
-                        "متن را کوتاه‌تر کن.")
-        raise ReelTooLong(f"Reel is {total:.0f}s, the limit is {MAX_REEL_SECONDS}s - shorten the script.")
+        _too_long(total, hook)
 
 
 async def build(hook, scenes, d, dst, tag=None):
@@ -3613,9 +3626,14 @@ def main():
         with tempfile.TemporaryDirectory() as t:
             asyncio.run(build(hook, scenes, Path(t), dst, tag))
     except TTSQuotaExhausted as exc:
-        sys.exit(f"STOPPED: {exc}")
-    except (TTSConfigError, ReelTooLong) as exc:
-        sys.exit(f"STOPPED: {exc}")
+        print(f"STOPPED (quota): {exc}", file=sys.stderr)
+        sys.exit(EXIT_QUOTA)
+    except TTSConfigError as exc:
+        print(f"STOPPED (config): {exc}", file=sys.stderr)
+        sys.exit(EXIT_CONFIG)
+    except ReelTooLong as exc:
+        print(f"STOPPED (too long): {exc}", file=sys.stderr)
+        sys.exit(EXIT_TOO_LONG)
 
 
 # ------------------------------------------------------------------ embedded background image
