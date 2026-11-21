@@ -62,7 +62,7 @@ jobs:
         run: python bot.py poll
 
       - name: Install FFmpeg, Persian fallback fonts and Chromium
-        if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
+        if: (steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != '') && steps.poll.outputs.paused != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fontconfig fonts-noto-core fonts-noto-extra
@@ -71,7 +71,7 @@ jobs:
 
       - name: Build and send reels
         id: build
-        if: steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != ''
+        if: (steps.poll.outputs.jobs != '0' || hashFiles('work/job_*.txt') != '') && steps.poll.outputs.paused != 'true'
         run: python bot.py build
 
       - name: Save voice cache
