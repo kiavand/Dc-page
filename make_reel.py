@@ -17,7 +17,7 @@ What is standard in v6.0
   * Persian typography fixed automatically (نیم‌فاصله, ی, trailing punctuation, ؟ ، digits)
   * Layout keeps text inside Instagram/Reels safe zones (SAFE_TOP / SAFE_BOTTOM / SAFE_SIDE)
   * Slide variety: card / punch (short lines) / big-number (title like "۹۰٪") layouts
-  * 160 detailed icons, chosen by meaning, NEVER repeated inside one video and
+  * 230 detailed icons, chosen by meaning, NEVER repeated inside one video and
     rotated across videos (.icon_history.json next to the output)
   * Sound design: whoosh/pop/impact/ding made in code, ambient bed that ducks under the
     voice (or your own mp3 from ./music), gentle voice EQ, 48 kHz audio
@@ -944,7 +944,7 @@ def make_bed(total, path):
 
 
 # ------------------------------------------------------------------ icons
-# 160 detailed icons: 120x120 grid. classes: f=soft fill, d=light detail, s=solid.
+# 230 detailed icons: 120x120 grid. classes: f=soft fill, d=light detail, s=solid.
 ICONS = {
  "robot": "<path d='M60 10v12M54 10h12'/><rect class='f' x='24' y='31' width='72' height='58' rx='18'/><path d='M24 49H13v23h11M96 49h11v23H96M39 89v12M81 89v12M45 101h30M39 54h10M71 54h10'/><rect class='f' x='43' y='43' width='34' height='23' rx='7'/><circle cx='51' cy='54' r='3' fill='currentColor'/><circle cx='69' cy='54' r='3' fill='currentColor'/><path d='M49 76h22M60 22v9'/>",
  "bitcoin": "<circle cx='60' cy='60' r='49'/><circle cx='60' cy='60' r='40'/><path d='M49 27v66M68 27v66M42 37h25c19 0 22 23 4 26 22 2 20 29 0 29H42M42 37h29M42 89h29'/><path d='M43 18v8M77 18v8M43 94v8M77 94v8'/>",
@@ -1105,7 +1105,77 @@ ICONS = {
  "map": "<path class='f' d='M10 24 40 12l40 12 30-12v84L80 108 40 96 10 108Z'/><path class='d' d='M40 12v84M80 24v84'/>",
  "send": "<path class='f' d='M10 56 110 10 80 108 58 78Z'/><path d='M58 78 110 10M58 78 56 104 72 90'/>",
  "layers": "<path class='f' d='M60 12 110 38 60 64 10 38Z'/><path d='m10 60 50 26 50-26M10 82l50 26 50-26'/>",
- "funnel": "<path class='f' d='M10 16h100L72 62v40l-24 8V62Z'/>"
+ "funnel": "<path class='f' d='M10 16h100L72 62v40l-24 8V62Z'/>",
+ "cat": "<path class='f' d='M20 16 46 34c9-3 19-3 28 0l26-18 6 46c0 28-18 44-46 44S14 90 14 62Z'/><circle class='s' cx='42' cy='60' r='4.5'/><circle class='s' cx='78' cy='60' r='4.5'/><path class='s' d='M54 72h12l-6 7Z'/><path d='M60 79v6M60 85q-6 6-12 2M60 85q6 6 12 2'/><path class='d' d='M6 68l24 5M8 84l22-5M114 68l-24 5M112 84l-22-5'/>",
+ "dog": "<path class='f' d='M38 22h44c10 0 16 10 16 24v22c0 24-16 40-38 40S22 92 22 68V46c0-14 6-24 16-24Z'/><path class='f' d='M36 24C20 18 8 34 10 62c1 10 9 14 15 8l5-28Z'/><path class='f' d='M84 24c16-6 28 10 26 38-1 10-9 14-15 8l-5-28Z'/><circle class='s' cx='46' cy='54' r='4.5'/><circle class='s' cx='74' cy='54' r='4.5'/><path class='f' d='M44 76h32v8c0 12-7 20-16 20s-16-8-16-20Z'/><path class='s' d='M53 78h14l-7 8Z'/><path d='M60 86v8'/>",
+ "rabbit": "<path class='f' d='M46 54C32 40 32 10 44 8c10-1 10 26 2 46Z'/><path class='f' d='M74 54C88 40 88 10 76 8c-10-1-10 26-2 46Z'/><path class='f' d='M24 80c0-20 14-32 36-32s36 12 36 32c0 20-14 30-36 30S24 100 24 80Z'/><circle class='s' cx='45' cy='76' r='4.5'/><circle class='s' cx='75' cy='76' r='4.5'/><path class='s' d='M54 86h12l-6 6Z'/><path d='M60 92v5M60 97q-6 5-11 1M60 97q6 5 11 1'/>",
+ "mouse": "<circle class='f' cx='28' cy='34' r='17'/><circle class='f' cx='92' cy='34' r='17'/><path class='f' d='M24 62c0-22 16-36 36-36s36 14 36 36c0 22-16 38-36 44C40 100 24 84 24 62Z'/><circle class='s' cx='44' cy='58' r='4.5'/><circle class='s' cx='76' cy='58' r='4.5'/><circle class='s' cx='60' cy='88' r='5.5'/><path class='d' d='M6 78l28 6M8 94l26-6M114 78l-28 6M112 94l-26-6'/>",
+ "horse": "<path class='f' d='M38 34 28 12 52 28Z'/><path class='f' d='M82 34 92 12 68 28Z'/><path class='f' d='M42 28h36l8 46c2 22-6 36-26 36S32 96 34 74Z'/><path class='d' d='M60 30v10M60 46v8'/><circle class='s' cx='45' cy='56' r='4.5'/><circle class='s' cx='75' cy='56' r='4.5'/><circle class='s' cx='52' cy='96' r='3.5'/><circle class='s' cx='68' cy='96' r='3.5'/><path d='M40 84h40'/>",
+ "donkey": "<path class='f' d='M47 38C30 32 22 14 28 6c10 2 24 14 28 32Z'/><path class='f' d='M73 38c17-6 25-24 19-32-10 2-24 14-28 32Z'/><path class='f' d='M42 34h36l8 40c2 22-6 34-26 34S32 96 34 74Z'/><path class='f' d='M40 84h40v6c0 12-8 18-20 18s-20-6-20-18Z'/><circle class='s' cx='45' cy='58' r='4.5'/><circle class='s' cx='75' cy='58' r='4.5'/><circle class='s' cx='52' cy='96' r='3.5'/><circle class='s' cx='68' cy='96' r='3.5'/>",
+ "goat": "<path class='f' d='M46 34C28 34 18 20 22 6c18 2 32 12 34 28Z'/><path class='f' d='M74 34c18 0 28-14 24-28-18 2-32 12-34 28Z'/><path class='f' d='M42 32h36l6 40c2 20-6 32-24 32S34 92 36 72Z'/><path class='f' d='M38 46 14 42l8 16 18 0Z'/><path class='f' d='M82 46l24-4-8 16-18 0Z'/><circle class='s' cx='48' cy='58' r='4.5'/><circle class='s' cx='72' cy='58' r='4.5'/><path class='d' d='M54 92h12'/><path d='M54 104l6 12 6-12'/>",
+ "bear": "<circle class='f' cx='28' cy='30' r='16'/><circle class='f' cx='92' cy='30' r='16'/><path class='f' d='M60 22c26 0 44 18 44 42s-18 44-44 44S16 88 16 64 34 22 60 22Z'/><path class='f' d='M42 80c0-8 8-14 18-14s18 6 18 14-8 14-18 14-18-6-18-14Z'/><circle class='s' cx='42' cy='54' r='4.5'/><circle class='s' cx='78' cy='54' r='4.5'/><path class='s' d='M53 72h14l-7 8Z'/><path d='M60 80v6M60 86q-6 5-10 2M60 86q6 5 10 2'/>",
+ "panda": "<circle class='s' cx='28' cy='30' r='15'/><circle class='s' cx='92' cy='30' r='15'/><path class='f' d='M60 22c26 0 44 18 44 42s-18 44-44 44S16 88 16 64 34 22 60 22Z'/><path class='f' d='M38 50c8-6 16 0 14 10-2 10-12 10-16 2-2-4-1-9 2-12Z'/><path class='f' d='M82 50c-8-6-16 0-14 10 2 10 12 10 16 2 2-4 1-9-2-12Z'/><circle class='s' cx='44' cy='57' r='3.5'/><circle class='s' cx='76' cy='57' r='3.5'/><path class='s' d='M53 74h14l-7 8Z'/><path d='M60 82v6M60 88q-6 5-10 2M60 88q6 5 10 2'/>",
+ "monkey": "<circle class='f' cx='14' cy='62' r='13'/><circle class='f' cx='106' cy='62' r='13'/><path class='f' d='M60 14c26 0 42 16 42 42s-16 50-42 50-42-24-42-50S34 14 60 14Z'/><path class='d' d='M38 52c0-12 10-14 22-4 12-10 22-8 22 4 0 8-6 12-12 16 8 4 10 12 6 20-6 8-30 8-36 0-4-8-2-16 6-20-6-4-8-8-8-16Z'/><circle class='s' cx='50' cy='54' r='4'/><circle class='s' cx='70' cy='54' r='4'/><circle class='s' cx='56' cy='76' r='2.5'/><circle class='s' cx='64' cy='76' r='2.5'/><path d='M50 90q10 6 20 0'/>",
+ "elephant": "<path class='f' d='M32 28C8 20 2 52 10 74c5 12 18 10 24 0Z'/><path class='f' d='M88 28c24-8 30 24 22 46-5 12-18 10-24 0Z'/><path class='f' d='M34 20c8-8 44-8 52 0 6 6 6 22 2 36-3 10-8 14-12 18H44c-4-4-9-8-12-18-4-14-4-30 2-36Z'/><path class='f' d='M48 66h24v34c0 10-6 14-12 14s-12-4-12-14Z'/><circle class='s' cx='46' cy='46' r='4.5'/><circle class='s' cx='74' cy='46' r='4.5'/><path class='d' d='M48 82h24M48 94h24'/>",
+ "giraffe": "<path d='M50 22V10M70 22V10'/><circle class='s' cx='50' cy='8' r='5'/><circle class='s' cx='70' cy='8' r='5'/><path class='f' d='M42 38 20 32l8 16 14-2ZM78 38l22-6-8 16-14-2Z'/><path class='f' d='M42 24h36l4 36c0 12-4 20-10 24H48c-6-4-10-12-10-24Z'/><path class='f' d='M48 84 40 114h40l-8-30'/><circle class='s' cx='49' cy='48' r='4.5'/><circle class='s' cx='71' cy='48' r='4.5'/><path class='d' d='M48 70h24'/><circle class='s' cx='53' cy='99' r='3.5'/><circle class='s' cx='67' cy='93' r='3.5'/>",
+ "camel": "<path d='M38 86v24M52 86v24M82 86v24M96 86v24'/><path class='f' d='M32 72c0-6 6-10 12-10 2-14 16-18 22-6 4-12 20-14 24 0 8-2 14 4 14 12 0 6-2 10-4 14H36c-2-2-4-6-4-10Z'/><path class='f' d='M34 70 46 66 36 30 18 36Z'/><path class='f' d='M6 30c0-8 6-12 14-12h12c6 0 8 4 6 10l-8 10H12c-4 0-6-4-6-8Z'/><circle class='s' cx='24' cy='26' r='3'/><path class='d' d='M10 34h10'/><path class='d' d='M110 76v18'/>",
+ "tiger": "<circle class='f' cx='26' cy='30' r='13'/><circle class='f' cx='94' cy='30' r='13'/><path class='f' d='M60 20c28 0 46 16 46 42 0 26-18 46-46 46S14 88 14 62 32 20 60 20Z'/><path class='d' d='M60 22v14M46 24l5 12M74 24l-5 12M14 56l14 4M16 74l14-3M106 56l-14 4M104 74l-14-3'/><circle class='s' cx='44' cy='56' r='4.5'/><circle class='s' cx='76' cy='56' r='4.5'/><path class='s' d='M54 70h12l-6 7Z'/><path d='M60 77v6M60 83q-8 7-14 3M60 83q8 7 14 3'/>",
+ "leopard": "<circle class='f' cx='26' cy='30' r='13'/><circle class='f' cx='94' cy='30' r='13'/><path class='f' d='M60 20c28 0 46 16 46 42 0 26-18 46-46 46S14 88 14 62 32 20 60 20Z'/><circle class='s' cx='38' cy='38' r='3'/><circle class='s' cx='82' cy='38' r='3'/><circle class='s' cx='60' cy='32' r='3'/><circle class='s' cx='24' cy='62' r='3'/><circle class='s' cx='96' cy='62' r='3'/><circle class='s' cx='28' cy='80' r='3'/><circle class='s' cx='92' cy='80' r='3'/><path class='d' d='M44 62q-3 12 3 24M76 62q3 12-3 24'/><circle class='s' cx='44' cy='56' r='4.5'/><circle class='s' cx='76' cy='56' r='4.5'/><path class='s' d='M54 72h12l-6 7Z'/><path d='M60 79v5M60 84q-7 6-12 2M60 84q7 6 12 2'/>",
+ "deer": "<path d='M46 34C40 24 38 14 34 6M38 20 24 16M36 28 20 28M74 34c6-10 8-20 12-28M82 20l14-4M84 28l16 0'/><path class='f' d='M40 40 18 36l12 14 12-2ZM80 40l22-4-12 14-12-2Z'/><path class='f' d='M40 34h40l-6 44c-1 16-8 28-14 28s-13-12-14-28Z'/><circle class='s' cx='49' cy='58' r='4.5'/><circle class='s' cx='71' cy='58' r='4.5'/><circle class='s' cx='60' cy='98' r='5.5'/>",
+ "pig": "<path class='f' d='M20 38 36 14 52 28Z'/><path class='f' d='M100 38 84 14 68 28Z'/><path class='f' d='M60 24c26 0 42 16 42 40 0 26-18 42-42 42S18 90 18 64 34 24 60 24Z'/><rect class='f' x='40' y='66' width='40' height='28' rx='14'/><circle class='s' cx='52' cy='80' r='3.8'/><circle class='s' cx='68' cy='80' r='3.8'/><circle class='s' cx='42' cy='52' r='4.5'/><circle class='s' cx='78' cy='52' r='4.5'/>",
+ "koala": "<circle class='f' cx='22' cy='36' r='20'/><circle class='d' cx='22' cy='36' r='9'/><circle class='f' cx='98' cy='36' r='20'/><circle class='d' cx='98' cy='36' r='9'/><path class='f' d='M60 24c26 0 42 16 42 40 0 26-18 42-42 42S18 90 18 64 34 24 60 24Z'/><path class='s' d='M52 62h16c4 0 6 6 4 12-2 6-6 8-12 8s-10-2-12-8c-2-6 0-12 4-12Z'/><circle class='s' cx='40' cy='52' r='4.5'/><circle class='s' cx='80' cy='52' r='4.5'/><path d='M60 84v6M60 90q-6 4-10 1M60 90q6 4 10 1'/>",
+ "squirrel": "<path class='f' d='M62 96c20 6 44-14 38-44-3-14-14-26-30-26 12 12 14 30-6 48Z'/><path class='f' d='M30 54c4-8 26-8 32 2 6 12 4 32-6 42-10 8-26 6-30-8-4-12-4-26 4-36Z'/><circle class='f' cx='38' cy='36' r='15'/><path class='f' d='M42 24 52 10 54 28Z'/><circle class='s' cx='32' cy='33' r='3.2'/><circle class='s' cx='24' cy='40' r='3'/><path class='d' d='M40 74q8 4 8 16'/><path d='M42 104h14'/>",
+ "hedgehog": "<path class='f' d='M14 84 20 66 14 56 28 54 28 40 42 44 48 30 58 38 66 26 72 40 86 34 86 48 100 46 96 58 108 64 100 74 108 86Z'/><path class='f' d='M8 88c2-10 10-16 24-16 6 8 6 16 0 22-14 2-22 0-24-6Z'/><circle class='s' cx='9' cy='84' r='3.5'/><circle class='s' cx='24' cy='80' r='3.5'/><path d='M46 98v10M80 98v10'/>",
+ "bat": "<path class='f' d='M48 52C36 36 22 30 6 32c6 8 6 16 2 24 8-2 14 2 16 10 6-6 12-6 18 0 2-6 4-10 6-14Z'/><path class='f' d='M72 52c12-16 26-22 42-20-6 8-6 16-2 24-8-2-14 2-16 10-6-6-12-6-18 0-2-6-4-10-6-14Z'/><path class='f' d='M60 34c8 0 12 8 12 20v28c0 8-6 14-12 14s-12-6-12-14V54c0-12 4-20 12-20Z'/><path class='f' d='M50 38 46 20l12 12ZM70 38l4-18-12 12Z'/><circle class='s' cx='55' cy='52' r='3'/><circle class='s' cx='65' cy='52' r='3'/><path class='d' d='M55 66l2 4 3-3 3 3 2-4'/>",
+ "rhino": "<path class='f' d='M36 32 24 10 46 22ZM84 32l12-22-22 12Z'/><path class='f' d='M32 40c0-14 12-22 28-22s28 8 28 22l6 36c2 22-10 34-34 34S24 98 26 76Z'/><path class='f' d='M50 72 60 30 70 72Z'/><circle class='s' cx='38' cy='56' r='4'/><circle class='s' cx='82' cy='56' r='4'/><circle class='s' cx='47' cy='94' r='3.5'/><circle class='s' cx='73' cy='94' r='3.5'/>",
+ "hippo": "<circle class='f' cx='38' cy='30' r='12'/><circle class='f' cx='82' cy='30' r='12'/><path class='f' d='M20 62c0-24 18-34 40-34s40 10 40 34v24c0 14-12 22-40 22S20 100 20 86Z'/><circle class='s' cx='38' cy='30' r='4'/><circle class='s' cx='82' cy='30' r='4'/><circle class='s' cx='46' cy='72' r='4'/><circle class='s' cx='74' cy='72' r='4'/><path d='M28 92h64'/><path class='d' d='M10 46l8 4M110 46l-8 4'/>",
+ "gorilla": "<path class='f' d='M60 14c22 0 36 10 38 26 8 6 10 18 8 30-2 22-18 38-46 38S16 92 14 70c-2-12 0-24 8-30 2-16 16-26 38-26Z'/><path class='d' d='M32 50q28-16 56 0'/><circle class='s' cx='46' cy='58' r='4.5'/><circle class='s' cx='74' cy='58' r='4.5'/><circle class='s' cx='55' cy='76' r='2.8'/><circle class='s' cx='65' cy='76' r='2.8'/><path d='M42 90q18 10 36 0'/>",
+ "unicorn": "<path class='f' d='M38 36 26 18 50 32Z'/><path class='f' d='M82 36 94 18 70 32Z'/><path class='f' d='M42 32h36l8 42c2 22-6 36-26 36S32 96 34 74Z'/><path class='f' d='M54 32 60 2 66 32Z'/><path class='d' d='M55 22l9-3M56 13l7-2'/><circle class='s' cx='45' cy='58' r='4.5'/><circle class='s' cx='75' cy='58' r='4.5'/><circle class='s' cx='52' cy='98' r='3.5'/><circle class='s' cx='68' cy='98' r='3.5'/><path class='d' d='M98 50l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z'/>",
+ "chicken": "<path class='f' d='M26 28 30 14 36 22 41 12 46 24Z'/><circle class='f' cx='36' cy='38' r='14'/><path class='s' d='M24 36 8 40l16 6Z'/><path class='f' d='M28 50c-3 10 3 14 7 9Z'/><path class='f' d='M36 52c10-4 34-4 46 8 10 10 8 26-2 34-10 8-30 6-40-4Z'/><path class='f' d='M80 62 104 34 108 62 102 84 84 84Z'/><circle class='s' cx='32' cy='35' r='3'/><path class='d' d='M52 70q12 8 24 0'/><path d='M54 94v14M70 94v14M50 108h8M66 108h8'/>",
+ "chick": "<path d='M54 28q4-12 12 0M60 26v-8'/><circle class='f' cx='60' cy='66' r='36'/><path class='s' d='M52 62h16l-8 11Z'/><circle class='s' cx='44' cy='54' r='4'/><circle class='s' cx='76' cy='54' r='4'/><path class='d' d='M22 70q-8 10 2 20M98 70q8 10-2 20'/><path d='M48 102v8M72 102v8M42 110h12M66 110h12'/>",
+ "duck": "<path class='f' d='M36 52c-4 14 2 36 24 42 22 6 44-6 44-26-12 6-22 0-24-12-4-12-24-18-44-4Z'/><circle class='f' cx='38' cy='38' r='15'/><path class='s' d='M24 38 6 42l18 8Z'/><circle class='s' cx='36' cy='33' r='3'/><path class='d' d='M62 74q12 6 24-2'/><path class='d' d='M10 108q8-6 16 0 8 6 16 0 8-6 16 0 8 6 16 0 8-6 16 0'/>",
+ "swan": "<path class='f' d='M30 88c0-14 14-24 32-24 22 0 38 8 38 22 0 10-14 18-34 18S30 98 30 88Z'/><path class='f' d='M36 76c-10-14-10-36 4-44 8-4 18 0 16 10-2 6-8 8-8 16 0 8 4 12 10 14Z'/><path class='s' d='M38 30 22 34l16 6Z'/><circle class='s' cx='46' cy='34' r='2.8'/><path class='d' d='M62 84q14 8 28 0'/>",
+ "eagle": "<path class='f' d='M54 46C40 30 24 28 6 36c8 4 12 10 12 18 8-2 14 2 18 10 6-6 14-8 20-6Z'/><path class='f' d='M66 46c14-16 30-18 48-10-8 4-12 10-12 18-8-2-14 2-18 10-6-6-14-8-20-6Z'/><path class='d' d='M16 44l14 8M12 54l16 6M104 44l-14 8M108 54l-16 6'/><path class='f' d='M52 30c0-8 4-12 8-12s8 4 8 12v26c0 10-4 20-8 28-4-8-8-18-8-28Z'/><path class='f' d='M50 84h20l6 26H44Z'/><path class='s' d='M55 26h10l-5 12Z'/><circle class='s' cx='56' cy='24' r='2'/><circle class='s' cx='64' cy='24' r='2'/>",
+ "owl": "<path class='f' d='M32 30c0-10 8-16 16-12l12 6 12-6c8-4 16 2 16 12v46c0 16-14 28-28 28S32 92 32 76Z'/><circle class='f' cx='46' cy='52' r='14'/><circle class='f' cx='74' cy='52' r='14'/><circle class='s' cx='46' cy='52' r='5'/><circle class='s' cx='74' cy='52' r='5'/><path class='s' d='M54 64h12l-6 12Z'/><path class='d' d='M46 88q14 8 28 0M50 100q10 6 20 0'/><path d='M46 110h10M64 110h10'/>",
+ "parrot": "<path class='f' d='M40 48c-4 24-2 40 14 52l10 12 4-14c8-16 4-38-8-50Z'/><circle class='f' cx='54' cy='34' r='18'/><path class='s' d='M38 28c-14-4-20 8-14 20 6-4 12-8 14-14Z'/><circle class='s' cx='54' cy='30' r='3.5'/><path class='d' d='M58 64q10 12 6 30M44 70q8 6 8 20'/><path d='M82 98h28'/>",
+ "peacock": "<path class='f' d='M8 74C8 36 30 10 60 10s52 26 52 64Z'/><path class='d' d='M60 70 16 48M60 70 30 22M60 70 60 12M60 70 90 22M60 70 104 48'/><circle class='s' cx='60' cy='24' r='5'/><circle class='s' cx='32' cy='34' r='5'/><circle class='s' cx='88' cy='34' r='5'/><circle class='s' cx='18' cy='56' r='5'/><circle class='s' cx='102' cy='56' r='5'/><path class='f' d='M60 114c-12 0-14-24-12-40 2-8 6-12 12-12s10 4 12 12c2 16 0 40-12 40Z'/><circle class='f' cx='60' cy='56' r='9'/><path d='M60 47v-8M56 40l4-6 4 6'/><path class='s' d='M56 58h8l-4 6Z'/>",
+ "penguin": "<path class='f' d='M60 10c-16 0-26 14-26 34 0 14-6 22-6 40 0 16 14 26 32 26s32-10 32-26c0-18-6-26-6-40 0-20-10-34-26-34Z'/><path class='d' d='M46 56c0 22 4 38 14 46 10-8 14-24 14-46 0-8-6-14-14-14S46 48 46 56Z'/><circle class='s' cx='50' cy='32' r='3.5'/><circle class='s' cx='70' cy='32' r='3.5'/><path class='s' d='M54 38h12l-6 10Z'/><path d='M30 62 16 88M90 62l14 26M44 112h14M62 112h14'/>",
+ "dove": "<path class='f' d='M14 74c6-12 20-20 34-16 6-12 22-26 46-30-2 16-10 30-24 38 8 2 18 0 26-6-4 18-22 30-44 30-14 4-28 2-38-4-2-4-2-8 0-12Z'/><circle class='f' cx='30' cy='56' r='11'/><path class='s' d='M20 56 6 60l14 4Z'/><circle class='s' cx='28' cy='53' r='2.8'/><path class='d' d='M58 66q10-14 26-22M66 76q12-8 26-12'/>",
+ "flamingo": "<path class='f' d='M44 60c8-8 28-8 38 4 4 8-2 18-12 20H48c-8-4-10-14-4-24Z'/><path d='M46 62C26 56 28 28 44 22c8-3 16 4 14 12'/><path class='s' d='M56 28l12 6-12 4Z'/><circle class='s' cx='47' cy='28' r='2.5'/><path d='M62 84v26M72 84v20l8 6M56 110h12'/><path class='d' d='M78 70q8 4 16 0'/>",
+ "stork": "<path class='f' d='M30 58c10-10 40-10 54 4 6 8 2 20-10 24H40c-10-4-14-16-10-28Z'/><path d='M36 58 30 30'/><circle class='f' cx='30' cy='24' r='8'/><path class='s' d='M24 22 2 26l22 4Z'/><circle class='s' cx='30' cy='22' r='2.5'/><path d='M52 86v24M66 86v18M48 110h10M62 104h10'/><path class='d' d='M84 66l22 10-8 4'/>",
+ "crow": "<circle class='f' cx='34' cy='46' r='13'/><path class='s' d='M22 44 4 50l18 4Z'/><circle class='s' cx='31' cy='43' r='3'/><path class='f' d='M34 56c14-8 36-6 48 8l22 10-24 4c-8 14-24 20-40 14-8-6-10-20-6-36Z'/><path class='d' d='M60 72q14 4 26 0'/><path d='M54 94v10M68 92v12'/><path d='M12 108h96'/>",
+ "hoopoe": "<path class='f' d='M30 36 22 14 32 24 36 8 42 24 50 12 50 36Z'/><circle class='f' cx='38' cy='46' r='13'/><path d='M26 46C14 48 8 54 4 62'/><circle class='s' cx='36' cy='43' r='3'/><path class='f' d='M40 56c14-6 34-4 44 10l20 8-22 6c-6 14-22 22-38 16-10-6-10-24-4-40Z'/><path class='d' d='M56 68h26M54 78h26M52 88h24'/><path d='M52 98v10M66 98v10'/>",
+ "nightingale": "<circle class='f' cx='40' cy='46' r='13'/><path class='s' d='M28 43 10 38l18 8ZM28 49l-18 6 18 0Z'/><circle class='s' cx='40' cy='42' r='3'/><path class='f' d='M38 56c14-8 34-6 44 8l18 8-20 4c-6 14-20 20-34 14-8-6-10-18-8-34Z'/><path d='M52 96v10M66 96v10'/><circle class='s' cx='82' cy='30' r='4.5'/><path d='M86 30V12l12 4'/><circle class='s' cx='100' cy='46' r='3.5'/><path d='M103 46V32l9 3'/>",
+ "phoenix": "<path d='M34 28c-4-8 0-14 4-20 2 8 8 10 6 20'/><circle class='f' cx='40' cy='38' r='11'/><path class='s' d='M30 36 16 40l14 4Z'/><circle class='s' cx='38' cy='35' r='2.6'/><path class='f' d='M44 46c16-4 32 4 38 20 4 12-2 26-14 32-12-4-22-14-26-28-2-8-2-18 2-24Z'/><path class='f' d='M60 54C66 38 84 24 108 24 98 40 94 56 78 68Z'/><path class='d' d='M74 48l18-12M78 58l18-10'/><path class='f' d='M66 96C56 106 38 114 16 110 30 102 48 98 64 92Z'/><path class='f' d='M72 98C72 110 62 118 46 118 54 110 62 106 68 96Z'/>",
+ "seagull": "<path class='f' d='M4 50C20 34 42 36 56 54L64 54C78 36 100 34 116 50 100 52 90 62 80 74L60 70 40 74C30 62 20 52 4 50Z'/><path class='f' d='M54 62h12l4 32-10 14-10-14Z'/><circle class='f' cx='60' cy='56' r='8'/><path class='s' d='M54 56 44 60l10 2Z'/><circle class='s' cx='58' cy='54' r='2'/>",
+ "fish": "<path class='f' d='M8 60C22 38 50 30 74 40c8 4 14 10 18 20-4 10-10 16-18 20-24 10-52 2-66-20Z'/><path class='f' d='M90 60l22-18v36Z'/><path class='d' d='M56 42 62 28 76 42M44 48q-6 12 0 24'/><circle class='s' cx='26' cy='57' r='4'/><path class='d' d='M58 56q6 4 0 8M70 56q6 4 0 8'/>",
+ "dolphin": "<path class='f' d='M6 86 22 78C26 52 50 32 78 36c14 2 22 12 24 24 6-8 14-12 20-10-2 14-12 24-26 26-8 20-34 30-62 20Z'/><path class='f' d='M50 38 56 18 74 38Z'/><circle class='s' cx='34' cy='72' r='3.5'/><path class='d' d='M48 86l-8 14 18-6'/><path class='d' d='M10 86q8 6 16 4'/>",
+ "whale": "<path class='f' d='M6 76c0-22 22-34 48-34 28 0 46 14 46 34 0 16-18 26-44 26-30 0-50-8-50-26Z'/><path class='f' d='M96 70c10-6 16-16 12-26 8 0 12 8 10 16-2 8-8 14-16 18Z'/><circle class='s' cx='28' cy='66' r='3.8'/><path class='d' d='M8 80q22 10 46 6'/><path d='M44 38c-4-8-12-10-14-20M44 38c4-8 12-10 14-20'/><path class='d' d='M56 90q-6 8-16 8'/>",
+ "shark": "<path class='f' d='M6 76C24 56 50 48 76 56c14 4 24 14 28 24l10-16v36l-10-16c-8 10-20 16-32 16-28 4-52-4-66-24Z'/><path class='f' d='M50 56 62 22 84 58Z'/><circle class='s' cx='26' cy='70' r='3.5'/><path class='d' d='M10 80l6 6 6-6 6 6 6-6 6 6'/><path class='d' d='M40 66q-4 8 0 14'/>",
+ "octopus": "<path class='f' d='M26 52c0-24 14-38 34-38s34 14 34 38c0 8-4 14-8 18H34c-4-4-8-10-8-18Z'/><path d='M36 70c-4 14-14 20-24 16M48 72c-2 14-8 26-16 32M60 72v34M72 72c2 14 8 26 16 32M84 70c4 14 14 20 24 16'/><circle class='s' cx='46' cy='48' r='5'/><circle class='s' cx='74' cy='48' r='5'/><path class='d' d='M50 62q10 6 20 0'/>",
+ "crab": "<path class='f' d='M30 66c0-14 14-22 30-22s30 8 30 22-14 22-30 22-30-8-30-22Z'/><path d='M32 58 20 44M88 58l12-14'/><path class='f' d='M20 44c-10 0-16-10-12-22 8 4 12 8 14 14 4-6 10-6 16-4-2 8-8 14-18 12Z'/><path class='f' d='M100 44c10 0 16-10 12-22-8 4-12 8-14 14-4-6-10-6-16-4 2 8 8 14 18 12Z'/><path d='M34 74 14 86M38 80 24 98M86 74l20 12M82 80l14 18'/><path d='M48 46v-10M72 46v-10'/><circle class='s' cx='48' cy='32' r='4.5'/><circle class='s' cx='72' cy='32' r='4.5'/><path class='d' d='M50 70q10 6 20 0'/>",
+ "starfish": "<path class='f' d='M60 8 73 44 112 46 82 70 92 108 60 87 28 108 38 70 8 46 47 44Z'/><circle class='d' cx='60' cy='58' r='4'/><path class='d' d='M60 30v14M32 56l12 4M88 56l-12 4M44 88l10-10M76 88 66 78'/>",
+ "jellyfish": "<path class='f' d='M20 58c0-26 18-44 40-44s40 18 40 44Z'/><path d='M30 58c-4 14 4 22 0 36M46 58c-4 14 4 26 0 44M62 58c-4 14 4 26 0 44M78 58c-4 14 4 26 0 44M92 58c-4 14 4 22 0 36'/><circle class='s' cx='46' cy='38' r='4'/><circle class='s' cx='74' cy='38' r='4'/><path class='d' d='M50 48q10 6 20 0'/>",
+ "snake": "<rect class='f' x='14' y='84' width='92' height='24' rx='12'/><rect class='f' x='24' y='62' width='72' height='24' rx='12'/><rect class='f' x='34' y='42' width='52' height='22' rx='11'/><path class='f' d='M42 44C36 36 38 20 50 14c10-5 22 0 24 12 1 8-4 14-10 18Z'/><circle class='s' cx='52' cy='26' r='3.2'/><circle class='s' cx='64' cy='26' r='3.2'/><path d='M58 38v8M58 46l-5 5M58 46l5 5'/><path class='d' d='M30 96h14M64 96h14M42 74h14M68 74h10'/>",
+ "frog": "<path class='f' d='M20 64c0-18 16-30 40-30s40 12 40 30c0 20-16 36-40 36S20 84 20 64Z'/><circle class='f' cx='38' cy='36' r='13'/><circle class='f' cx='82' cy='36' r='13'/><circle class='s' cx='38' cy='36' r='5'/><circle class='s' cx='82' cy='36' r='5'/><circle class='s' cx='54' cy='58' r='2.3'/><circle class='s' cx='66' cy='58' r='2.3'/><path d='M30 72q30 24 60 0'/><path d='M18 86 8 104l20-4M102 86l10 18-20-4'/>",
+ "lizard": "<path class='f' d='M60 6c8 0 12 8 12 16l-2 12c8 4 14 12 14 22l-2 10c-2 12-4 22-8 32-2 8-8 14-14 14s-12-6-14-14c-4-10-6-20-8-32l-2-10c0-10 6-18 14-22l-2-12c0-8 4-16 12-16Z'/><path d='M36 50 16 42 12 56 34 62M84 50l20-8 4 14-22 6M38 86 18 94l6 12 18-10M82 86l20 8-6 12-18-10'/><circle class='s' cx='54' cy='20' r='3'/><circle class='s' cx='66' cy='20' r='3'/><path class='d' d='M60 36v56M52 48h16M52 62h16M54 76h12'/>",
+ "crocodile": "<path class='f' d='M4 74c0-8 6-10 12-10h40c6-8 16-10 24-6 8-6 22-4 30 4 6 6 8 12 6 20-6-2-12 0-16 6-6-4-14-4-22 2-8 4-22 4-32-2H14C8 88 4 82 4 74Z'/><path class='d' d='M8 72l5 6 5-6 5 6 5-6 5 6 5-6M62 52l4-8 6 6 6-8 6 8 6-6 4 8'/><circle class='s' cx='62' cy='64' r='3'/><path d='M98 90l8 10M72 92l-2 10'/>",
+ "butterfly": "<path class='f' d='M58 54C50 28 20 14 10 30c-6 12 6 28 24 30 8 0 16 0 24-6Z'/><path class='f' d='M62 54C70 28 100 14 110 30c6 12-6 28-24 30-8 0-16 0-24-6Z'/><path class='f' d='M58 62c-8 2-18 6-24 12-10 12-2 30 12 30 10 0 14-14 12-42Z'/><path class='f' d='M62 62c8 2 18 6 24 12 10 12 2 30-12 30-10 0-14-14-12-42Z'/><path d='M60 40v52M60 40 50 22M60 40l10-18'/><circle class='s' cx='30' cy='36' r='4'/><circle class='s' cx='90' cy='36' r='4'/>",
+ "bee": "<path class='f' d='M46 46C36 26 22 24 22 36s14 14 24 10Z'/><path class='f' d='M74 46c10-20 24-22 24-10s-14 14-24 10Z'/><path class='f' d='M36 66c0-14 10-22 24-22s24 8 24 22-10 28-24 28-24-14-24-28Z'/><path class='d' d='M42 56h36M38 68h44M44 80h32'/><circle class='f' cx='60' cy='38' r='10'/><circle class='s' cx='56' cy='36' r='2.5'/><circle class='s' cx='64' cy='36' r='2.5'/><path d='M54 29 48 18M66 29l6-11M60 94v10'/>",
+ "ant": "<circle class='f' cx='26' cy='58' r='11'/><ellipse class='f' cx='52' cy='62' rx='11' ry='9'/><ellipse class='f' cx='84' cy='64' rx='19' ry='15'/><circle class='s' cx='22' cy='55' r='2.5'/><path d='M20 48 10 34M28 47l4-14M48 70 40 94M54 71l2 24M60 68l14 26M46 55 38 38M58 56l8-18'/>",
+ "spider": "<circle class='f' cx='60' cy='78' r='17'/><circle class='f' cx='60' cy='50' r='11'/><circle class='s' cx='55' cy='47' r='2.5'/><circle class='s' cx='65' cy='47' r='2.5'/><path d='M50 46 22 24 10 34M50 54 14 52 6 68M52 66 20 80 12 98M54 78 36 106M70 46l28-22 12 10M70 54l36-2 8 16M68 66l32 14 8 18M66 78l18 28'/><path class='d' d='M52 74q8 6 16 0M54 84q6 4 12 0'/>",
+ "ladybug": "<path class='f' d='M40 28c0-10 10-18 20-18s20 8 20 18Z'/><circle class='f' cx='60' cy='68' r='38'/><path d='M60 30v76M48 12 42 2M72 12l6-10'/><circle class='s' cx='40' cy='58' r='5'/><circle class='s' cx='80' cy='58' r='5'/><circle class='s' cx='42' cy='84' r='5'/><circle class='s' cx='78' cy='84' r='5'/>",
+ "snail": "<circle class='f' cx='70' cy='54' r='32'/><path class='d' d='M70 54m-3 0a3 3 0 1 1 6 0a9 9 0 1 1-18 0a16 16 0 1 1 32 0a23 23 0 1 1-46 0'/><path class='f' d='M10 100c0-10 10-14 24-14h66c0 10-12 16-32 16H22c-6 0-12-2-12-2Z'/><path d='M16 88 10 66M26 86 26 64'/><circle class='s' cx='10' cy='64' r='4'/><circle class='s' cx='26' cy='62' r='4'/>",
+ "scorpion": "<path class='f' d='M44 80c0-12 8-20 16-20s16 8 16 20-8 24-16 24-16-12-16-24Z'/><path d='M60 60c0-30 24-40 36-30 8 8 2 22-10 22'/><path class='s' d='M86 52 92 66 98 50Z'/><path class='f' d='M42 70C30 66 22 56 24 44 36 46 42 54 46 62Z'/><path class='f' d='M78 70c12-4 20-14 18-26-12 2-18 10-22 18Z'/><path d='M44 84 24 92M46 94 30 106M76 84l20 8M74 94l16 12'/><path class='d' d='M52 76h16M52 88h16'/>",
+ "fly": "<path class='f' d='M50 56 16 34 10 62 42 76Z'/><path class='f' d='M70 56l34-22 6 28-32 14Z'/><ellipse class='f' cx='60' cy='72' rx='13' ry='22'/><circle class='f' cx='60' cy='40' r='11'/><circle class='s' cx='53' cy='38' r='5'/><circle class='s' cx='67' cy='38' r='5'/><path d='M49 70 30 84M49 80 36 100M71 70l19 14M71 80l13 20'/><path class='d' d='M54 66h12M54 76h12'/>",
+ "grasshopper": "<path class='f' d='M22 66c6-12 22-14 34-8 12 6 24 8 38 4l14-8-6 16c-12 10-26 12-40 6-10 6-26 4-40-10Z'/><circle class='f' cx='20' cy='60' r='9'/><circle class='s' cx='17' cy='58' r='2.5'/><path d='M14 52 6 40M22 52l4-12'/><path d='M60 64 80 36 104 90'/><path d='M104 90l8 4M36 76 30 96M48 80l-2 18'/>",
+ "dragonfly": "<path d='M60 14v96'/><path class='f' d='M60 36C42 20 20 22 10 32c12 10 34 12 50 6Z'/><path class='f' d='M60 36c18-16 40-14 50-4-12 10-34 12-50 6Z'/><path class='f' d='M60 48C44 40 26 48 20 60c14 4 30 0 40-4Z'/><path class='f' d='M60 48c16-8 34 0 40 12-14 4-30 0-40-4Z'/><circle class='f' cx='60' cy='20' r='8'/><circle class='s' cx='56' cy='18' r='2.5'/><circle class='s' cx='64' cy='18' r='2.5'/>",
+ "caterpillar": "<circle class='f' cx='20' cy='82' r='10'/><circle class='f' cx='38' cy='72' r='11'/><circle class='f' cx='58' cy='66' r='12'/><circle class='f' cx='80' cy='66' r='12'/><circle class='f' cx='100' cy='74' r='13'/><circle class='s' cx='104' cy='70' r='2.8'/><path d='M104 62 108 50M96 62l-2-12'/><path class='d' d='M20 92v8M38 83v10M58 78v14M80 78v14'/>",
+ "ostrich": "<path class='f' d='M96 62 112 48 114 74 102 84Z'/><path class='f' d='M28 62C24 46 26 30 30 22h12c2 12 2 28 2 40Z'/><circle class='f' cx='34' cy='15' r='9'/><path class='s' d='M26 14 10 16l16 6Z'/><circle class='s' cx='36' cy='12' r='2.5'/><path class='f' d='M26 74c0-14 16-22 36-22s40 8 40 22-16 24-40 24-36-10-36-24Z'/><path class='d' d='M54 70q14 8 30 0'/><path d='M54 96v14M74 96v14M48 110h12M68 110h12'/>",
+ "kangaroo": "<path d='M42 20 34 2M50 18 58 4'/><circle class='f' cx='46' cy='30' r='13'/><circle class='s' cx='33' cy='34' r='3.2'/><circle class='s' cx='44' cy='27' r='2.6'/><path class='f' d='M44 42c-8 18-10 38 4 50h28c10-14 8-36-6-48Z'/><path class='f' d='M76 92C92 98 108 106 114 116 96 116 80 108 68 98Z'/><path class='d' d='M50 58l-12 8M58 58l-6 10M52 74q10 8 20 0'/><path d='M54 92v14l-12 6'/>",
+ "seal": "<path class='f' d='M6 84c0-18 18-32 44-32 16 0 28 6 36 14l24-6-10 18 10 18-26-2c-8 10-22 16-38 16-24 0-40-10-40-26Z'/><circle class='s' cx='26' cy='72' r='3.8'/><circle class='s' cx='10' cy='80' r='3.5'/><path class='d' d='M4 90l-4 2M16 86l-8 6M22 82l-6 10'/><path class='d' d='M56 90q8 6 18 2'/>",
+ "raccoon": "<circle class='f' cx='26' cy='30' r='13'/><circle class='f' cx='94' cy='30' r='13'/><path class='f' d='M60 20c28 0 46 16 46 42 0 26-18 46-46 46S14 88 14 62 32 20 60 20Z'/><path class='d' d='M16 56c14-10 30-10 44-2 14-8 30-8 44 2l-4 16c-12 4-24 0-40-10-16 10-28 14-40 10Z'/><circle class='s' cx='42' cy='60' r='4.5'/><circle class='s' cx='78' cy='60' r='4.5'/><path class='d' d='M60 26v12'/><circle class='s' cx='60' cy='84' r='5'/><path d='M60 89v5M60 94q-6 5-10 2M60 94q6 5 10 2'/>",
+ "dragon": "<path class='f' d='M38 32 24 6 48 24ZM82 32 96 6 72 24Z'/><path class='f' d='M60 20c22 0 36 14 38 32l10 22-24 6-4 22H40l-4-22-24-6 10-22c2-18 16-32 38-32Z'/><path class='d' d='M36 44l16 6M84 44l-16 6'/><circle class='s' cx='46' cy='54' r='4'/><circle class='s' cx='74' cy='54' r='4'/><circle class='s' cx='53' cy='80' r='3'/><circle class='s' cx='67' cy='80' r='3'/><path class='d' d='M46 98l4 10 4-10M66 98l4 10 4-10'/><path class='d' d='M26 84c-8 4-14 2-18-4M94 84c8 4 14 2 18-4'/>"
 }
 
 # icon -> Persian keywords (phrases contain spaces)
@@ -2507,7 +2577,11 @@ KEYWORDS = {
   "ماده",
   "شجاعت",
   "شجاع",
-  "جرات"
+  "جرات",
+  "شیر ژیان",
+  "سلطان جنگل",
+  "شیر نر",
+  "شیرها"
  ],
  "fox": [
   "روباه",
@@ -2518,25 +2592,30 @@ KEYWORDS = {
   "گرگ",
   "گرگها",
   "ها",
-  "گرگینه"
+  "گرگینه",
+  "شغال",
+  "گرگ ها"
  ],
  "sheep": [
   "گوسفند",
   "گوسفندها",
   "میش",
-  "بره"
+  "بره",
+  "قوچ",
+  "بره ها",
+  "گله"
  ],
  "cow": [
   "گاو",
   "گاوها",
-  "گوساله"
+  "گوساله",
+  "گاومیش",
+  "گاو نر",
+  "ورزا"
  ],
  "bird": [
   "پرنده",
   "پرندگان",
-  "کبوتر",
-  "عقاب",
-  "جوجه",
   "بال",
   "پرواز",
   "آزادی",
@@ -2547,7 +2626,10 @@ KEYWORDS = {
   "آرام آرام",
   "لاک پشت",
   "آهسته",
-  "صبوری"
+  "صبوری",
+  "لاکپشت",
+  "لاک‌پشت‌ها",
+  "سنگ پشت"
  ],
  "flask": [
   "آزمایش",
@@ -2643,7 +2725,77 @@ KEYWORDS = {
   "شاخص",
   "کارایی",
   "بازدهی"
- ]
+ ],
+ "cat": ["گربه", "گربه‌ها", "گربه‌ای", "بچه گربه", "گربه سیاه", "گربه وحشی", "میو"],
+ "dog": ["سگ", "سگ‌ها", "توله", "توله سگ", "سگ نگهبان", "سگ ولگرد", "سگی"],
+ "rabbit": ["خرگوش", "خرگوش‌ها", "خرگوشی"],
+ "mouse": ["موش", "موش‌ها", "موشی", "موش صحرایی", "موش و گربه"],
+ "horse": ["اسب", "اسب‌ها", "اسبی", "اسب سواری", "اسبسواری", "سوارکار", "اسب سوار"],
+ "donkey": ["الاغ", "الاغ‌ها", "خر", "خرها"],
+ "goat": ["بز", "بزها", "بزغاله", "بز کوهی"],
+ "bear": ["خرس", "خرس‌ها", "خرس قطبی"],
+ "panda": ["پاندا", "پاندا‌ها"],
+ "monkey": ["میمون", "میمون‌ها", "بوزینه", "شامپانزه"],
+ "elephant": ["فیل", "فیل‌ها", "فیلبان", "فیلی"],
+ "giraffe": ["زرافه", "زرافه‌ها"],
+ "camel": ["شتر", "شترها", "شتر سواری", "شترسواری", "کاروان"],
+ "tiger": ["ببر", "ببرها", "ببر بنگال", "ببری"],
+ "leopard": ["پلنگ", "پلنگ‌ها", "یوزپلنگ", "یوز", "چیتا", "پلنگ صورتی"],
+ "deer": ["آهو", "آهوان", "آهوی", "گوزن", "گوزن‌ها", "آهو بره"],
+ "pig": ["خوک", "خوک‌ها", "گراز", "گرازها"],
+ "koala": ["کوآلا", "کوالا"],
+ "squirrel": ["سنجاب", "سنجاب‌ها"],
+ "hedgehog": ["جوجه تیغی", "جوجه‌تیغی", "خارپشت"],
+ "bat": ["خفاش", "خفاش‌ها", "شب پره"],
+ "rhino": ["کرگدن", "کرگدن‌ها"],
+ "hippo": ["اسب آبی", "اسب‌آبی"],
+ "gorilla": ["گوریل", "گوریل‌ها"],
+ "unicorn": ["تک شاخ", "اسب تک شاخ", "یونیکورن"],
+ "chicken": ["مرغ", "مرغ‌ها", "مرغان", "خروس", "خروس‌ها", "مرغ و خروس", "مرغ خانگی", "تخم مرغ", "مرغداری", "خروس خوان"],
+ "chick": ["جوجه", "جوجه‌ها", "جوجه اردک"],
+ "duck": ["اردک", "اردک‌ها", "غاز", "غازها"],
+ "swan": ["قو", "قوها", "دریاچه قو"],
+ "eagle": ["عقاب", "عقاب‌ها", "شاهین"],
+ "owl": ["جغد", "جغدها", "بوف", "جغد دانا"],
+ "parrot": ["طوطی", "طوطی‌ها", "مرغ سخنگو"],
+ "peacock": ["طاووس", "طاووس‌ها", "طاوس"],
+ "penguin": ["پنگوئن", "پنگوین", "پنگوئن‌ها"],
+ "dove": ["کبوتر", "کبوترها", "کبوتران", "کبوتر صلح", "کبوتر سفید", "کبوتر پران"],
+ "flamingo": ["فلامینگو", "فلامینگو‌ها"],
+ "stork": ["لک لک", "لک‌لک", "لک‌لک‌ها"],
+ "crow": ["کلاغ", "کلاغ‌ها", "زاغ", "کلاغ پر"],
+ "hoopoe": ["هدهد", "هدهدها", "منطق الطیر", "هدهد سلیمان"],
+ "nightingale": ["بلبل", "بلبل‌ها", "گل و بلبل", "بلبل زبان"],
+ "phoenix": ["ققنوس", "سیمرغ", "عنقا", "ققنوس‌ها"],
+ "seagull": ["مرغ دریایی", "مرغان دریایی", "مرغ ماهیخوار", "ماهیخوار"],
+ "fish": ["ماهی", "ماهی‌ها", "ماهیان", "ماهیگیر", "ماهیگیری", "ماهی قرمز", "تور ماهیگیری"],
+ "dolphin": ["دلفین", "دلفین‌ها"],
+ "whale": ["نهنگ", "نهنگ‌ها", "نهنگ آبی"],
+ "shark": ["کوسه", "کوسه‌ها", "کوسه ماهی"],
+ "octopus": ["اختاپوس", "اختاپوس‌ها", "هشت پا", "هشتپا"],
+ "crab": ["خرچنگ", "خرچنگ‌ها"],
+ "starfish": ["ستاره دریایی", "ستاره های دریایی"],
+ "jellyfish": ["عروس دریایی", "عروس های دریایی"],
+ "snake": ["مار", "مارها", "ماران", "افعی", "مار کبری", "مار سمی"],
+ "frog": ["قورباغه", "قورباغه‌ها", "وزغ"],
+ "lizard": ["مارمولک", "مارمولک‌ها", "سوسمار", "آفتاب پرست", "آفتاب‌پرست"],
+ "crocodile": ["تمساح", "تمساح‌ها", "کروکودیل"],
+ "butterfly": ["پروانه", "پروانه‌ها", "پروانه‌ای", "شفیره"],
+ "bee": ["زنبور", "زنبورها", "زنبور عسل", "کندو", "زنبوردار", "زنبورداری"],
+ "ant": ["مورچه", "مورچه‌ها", "مورچگان", "لانه مورچه"],
+ "spider": ["عنکبوت", "عنکبوت‌ها", "تار عنکبوت"],
+ "ladybug": ["کفشدوزک", "کفش دوزک", "کفشدوزک‌ها"],
+ "snail": ["حلزون", "حلزون‌ها"],
+ "scorpion": ["عقرب", "عقرب‌ها", "نیش عقرب"],
+ "fly": ["مگس", "مگس‌ها", "پشه", "پشه‌ها", "حشره", "حشرات"],
+ "grasshopper": ["ملخ", "ملخ‌ها", "جیرجیرک", "جیرجیرک‌ها"],
+ "dragonfly": ["سنجاقک", "سنجاقک‌ها"],
+ "caterpillar": ["کرم ابریشم", "کرم‌ها", "کرم کتاب", "کرم ابریشمی"],
+ "ostrich": ["شترمرغ", "شتر مرغ", "شترمرغ‌ها"],
+ "kangaroo": ["کانگورو", "کانگوروها"],
+ "seal": ["فوک", "فوک‌ها", "شیر دریایی", "سگ آبی"],
+ "raccoon": ["راکون", "راکون‌ها"],
+ "dragon": ["اژدها", "اژدهای", "اژدهایان"]
 }
 
 # icon -> semantic neighbours used when the best icon is already taken
@@ -2889,7 +3041,83 @@ RELATED = {
   "umbrella",
   "safe",
   "anchor"
- ]
+ ],
+ "cat": ["dog", "tiger", "leopard", "mouse"],
+ "dog": ["wolf", "cat", "fox", "horse"],
+ "rabbit": ["mouse", "squirrel", "sheep", "chick"],
+ "mouse": ["rabbit", "squirrel", "cat", "hedgehog"],
+ "horse": ["donkey", "unicorn", "deer", "cow"],
+ "donkey": ["horse", "goat", "cow", "sheep"],
+ "goat": ["sheep", "deer", "cow", "donkey"],
+ "bear": ["panda", "gorilla", "koala", "lion"],
+ "panda": ["bear", "koala", "monkey"],
+ "monkey": ["gorilla", "bear", "koala"],
+ "elephant": ["rhino", "hippo", "giraffe", "camel"],
+ "giraffe": ["deer", "camel", "elephant"],
+ "camel": ["horse", "donkey", "elephant", "ostrich"],
+ "tiger": ["lion", "leopard", "cat"],
+ "leopard": ["tiger", "lion", "cat", "fox"],
+ "deer": ["horse", "goat", "giraffe"],
+ "pig": ["cow", "sheep", "hippo"],
+ "koala": ["panda", "bear", "monkey"],
+ "squirrel": ["mouse", "rabbit", "hedgehog"],
+ "hedgehog": ["mouse", "squirrel", "turtle"],
+ "bat": ["owl", "bird", "mouse"],
+ "rhino": ["hippo", "elephant", "cow"],
+ "hippo": ["rhino", "elephant", "pig"],
+ "gorilla": ["monkey", "bear"],
+ "unicorn": ["horse", "star", "spark"],
+ "chicken": ["chick", "duck", "bird", "peacock"],
+ "chick": ["chicken", "duck", "bird"],
+ "duck": ["swan", "chicken", "chick", "fish"],
+ "swan": ["duck", "dove", "flamingo"],
+ "eagle": ["owl", "bird", "crow", "lion"],
+ "owl": ["eagle", "bat", "crow", "bird"],
+ "parrot": ["bird", "peacock", "nightingale"],
+ "peacock": ["parrot", "flamingo", "chicken"],
+ "penguin": ["bird", "seal", "whale"],
+ "dove": ["bird", "swan", "nightingale", "seagull"],
+ "flamingo": ["stork", "swan", "peacock"],
+ "stork": ["flamingo", "swan", "bird"],
+ "crow": ["owl", "eagle", "bird"],
+ "hoopoe": ["bird", "nightingale", "parrot"],
+ "nightingale": ["bird", "hoopoe", "music"],
+ "phoenix": ["fire", "eagle", "bird", "spark"],
+ "seagull": ["bird", "dove", "fish", "waves"],
+ "fish": ["whale", "dolphin", "shark", "waves"],
+ "dolphin": ["whale", "fish", "shark", "waves"],
+ "whale": ["dolphin", "shark", "fish", "waves"],
+ "shark": ["fish", "whale", "dolphin"],
+ "octopus": ["crab", "jellyfish", "starfish", "fish"],
+ "crab": ["octopus", "starfish", "scorpion"],
+ "starfish": ["jellyfish", "crab", "star"],
+ "jellyfish": ["octopus", "starfish", "fish"],
+ "snake": ["lizard", "crocodile", "frog"],
+ "frog": ["lizard", "turtle", "snake"],
+ "lizard": ["snake", "crocodile", "frog", "turtle"],
+ "crocodile": ["lizard", "snake", "turtle"],
+ "butterfly": ["bee", "ladybug", "dragonfly", "spark"],
+ "bee": ["butterfly", "ant", "ladybug"],
+ "ant": ["bee", "spider", "ladybug"],
+ "spider": ["scorpion", "ant", "fly"],
+ "ladybug": ["butterfly", "bee", "ant"],
+ "snail": ["turtle", "caterpillar"],
+ "scorpion": ["spider", "crab", "snake"],
+ "fly": ["bee", "dragonfly", "ant"],
+ "grasshopper": ["ant", "fly", "frog"],
+ "dragonfly": ["butterfly", "fly", "bee"],
+ "caterpillar": ["butterfly", "snail", "ant"],
+ "ostrich": ["bird", "chicken", "camel"],
+ "kangaroo": ["koala", "rabbit", "mouse"],
+ "seal": ["penguin", "dolphin", "whale"],
+ "raccoon": ["fox", "bear", "cat"],
+ "dragon": ["fire", "lion", "snake", "crocodile"],
+ "lion": ["tiger", "leopard", "cat"],
+ "wolf": ["dog", "fox"],
+ "fox": ["wolf", "dog", "raccoon"],
+ "sheep": ["goat", "cow"],
+ "cow": ["sheep", "goat", "pig"],
+ "turtle": ["snail", "frog"]
 }
 
 
@@ -2945,17 +3173,25 @@ def rank_icons(text, context=""):
     if context:
         for k, v in _score(context, _NORM_KW).items():
             scores[k] = scores.get(k, 0) + 0.3 * v
+    for kind in list(scores):                       # an animal named in the text is the subject of the picture
+        if kind in ANIMAL_KINDS:
+            scores[kind] *= 1.5
     for kind, sc in list(scores.items()):          # semantic neighbours as fall-backs
         for i, alt in enumerate(RELATED.get(kind, ())):
             scores[alt] = max(scores.get(alt, 0), sc * (0.7 - 0.05 * i))
     return sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
 
 
+# animal icons only appear when the text is about animals (never as random filler)
+ANIMAL_KINDS = frozenset(["ant", "bat", "bear", "bee", "bird", "butterfly", "camel", "cat", "caterpillar", "chick", "chicken", "cow", "crab", "crocodile", "crow", "deer", "dog", "dolphin", "donkey", "dove", "dragon", "dragonfly", "duck", "eagle", "elephant", "fish", "flamingo", "fly", "fox", "frog", "giraffe", "goat", "gorilla", "grasshopper", "hedgehog", "hippo", "hoopoe", "horse", "jellyfish", "kangaroo", "koala", "ladybug", "leopard", "lion", "lizard", "monkey", "mouse", "nightingale", "octopus", "ostrich", "owl", "panda", "parrot", "peacock", "penguin", "phoenix", "pig", "rabbit", "raccoon", "rhino", "scorpion", "seagull", "seal", "shark", "sheep", "snail", "snake", "spider", "squirrel", "starfish", "stork", "swan", "tiger", "turtle", "unicorn", "whale", "wolf"])
+
+
 def icon_kind(text):
     ranked = rank_icons(text)
     if ranked:
         return ranked[0][0]
-    return sorted(ICONS)[int(hashlib.sha256(norm(text).encode()).hexdigest()[:8], 16) % len(ICONS)]
+    plain = sorted(k for k in ICONS if k not in ANIMAL_KINDS)
+    return plain[int(hashlib.sha256(norm(text).encode()).hexdigest()[:8], 16) % len(plain)]
 
 
 def assign_unique_icon_kinds(items, reserved=(), recent=None):
@@ -2972,6 +3208,7 @@ def assign_unique_icon_kinds(items, reserved=(), recent=None):
             if len(used) >= len(ICONS):
                 used.clear()
             pool = ([k for k in FILLER if k in ICONS and k not in used]
+                    or [k for k in sorted(ICONS) if k not in used and k not in ANIMAL_KINDS]
                     or [k for k in sorted(ICONS) if k not in used] or sorted(ICONS))
             pool.sort(key=lambda k: (recent.get(k, 0),
                                      hashlib.sha256((norm(text) + k).encode()).hexdigest()))
